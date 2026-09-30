@@ -29,6 +29,26 @@ pnpm prereq
 
 > Jangan tertukar dengan `pnpm doctor`: itu perintah bawaan pnpm untuk mendiagnosa instalasi pnpm sendiri.
 
+## Layanan lokal
+
+```sh
+docker compose up -d --wait
+```
+
+| Service | Port | Isi |
+| --- | --- | --- |
+| `postgres` | 5432 | PostgreSQL 17, data disimpan di volume `postgres-data` |
+| `firebase-auth` | 9099 | Firebase Auth Emulator, project `demo-template` |
+| `firebase-storage` | 9199 | Firebase Storage Emulator, bucket `demo-template.appspot.com` |
+
+- Build pertama image emulator (`docker/firebase-emulator/Dockerfile`) butuh sekitar 5–7 menit; setelah itu `up` selesai dalam hitungan detik.
+- Nilai diambil dari `.env` bila ada, dengan default yang sama dengan `.env.example`.
+- `firebase.json` dan `storage.rules` di-mount ke container. Setelah mengubahnya, jalankan `docker compose up -d --wait --force-recreate firebase-storage`; tidak perlu build ulang.
+- `storage.rules` menolak semua akses client. API mengakses Storage lewat firebase-admin, yang tidak terikat aturan ini.
+- Cek cepat: `curl http://localhost:9099/` berisi `"ready": true`.
+- Berhenti: `docker compose down` (data PostgreSQL tetap ada); hapus data: `docker compose down -v`.
+- `pnpm prereq` ikut menampilkan status ketiga layanan sebagai prasyarat opsional.
+
 ## Perintah
 
 | Perintah | Fungsi |

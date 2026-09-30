@@ -9,7 +9,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `package.json`, `pnpm-workspace.yaml`, `.nvmrc`, `.gitattributes`, `.gitignore`, `.editorconfig`, `biome.json`, `scripts/prereq.mjs`, `README.md`, `docs/conventions.md` (kerangka awal)
   - done when: `pnpm install` sukses; `pnpm biome check .` bersih; `pnpm prereq` menampilkan tabel status semua prasyarat bagian 3 PRD dengan exit code 0 saat lengkap; diuji dengan Docker Desktop dimatikan (gagal dengan saran jelas) dan `.env` belum ada (menampilkan perintah salin, tidak membuat file); spike Biome (D-08) dicatat hasilnya di log
 
-- [ ] T-002 Docker Compose: PostgreSQL, Auth Emulator, Storage Emulator
+- [x] T-002 Docker Compose: PostgreSQL, Auth Emulator, Storage Emulator
   - layer: infra · depends_on: T-001 · refs: FR-02, D-13
   - files: `docker-compose.yml`, `docker/firebase-emulator/Dockerfile`, `firebase.json`, `.firebaserc`, `storage.rules`, `.env.example`, `scripts/prereq.mjs` (cek layanan opsional), `README.md`
   - done when: `docker compose up -d --wait` membuat ketiga layanan healthy; `curl http://localhost:9099/` berisi `"ready": true`; Storage Emulator merespons di port 9199; `storage.rules` menolak semua akses; waktu build pertama dan build ulang image emulator dicatat di log; `.env.example` berisi semua variabel yang dipakai sampai tahap ini

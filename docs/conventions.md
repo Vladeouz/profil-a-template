@@ -12,6 +12,7 @@ Library dipin ke versi pasti (tanpa `^` atau `~`) saat pertama dipasang, lalu di
 | pnpm | 12.6.0 (`packageManager`) | T-001 |
 | `@biomejs/biome` | 2.5.14 | T-001 |
 | PostgreSQL | 17 (`postgres:17-alpine`) | T-002 |
+| `firebase-tools` (image emulator) | 15.32.0, di atas `node:24-trixie-slim` + OpenJDK 21 | T-002 |
 | Flutter | dicatat di T-004 | T-004 |
 
 ## Git

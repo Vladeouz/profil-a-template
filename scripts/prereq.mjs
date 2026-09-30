@@ -22,6 +22,7 @@ function run(command, timeoutMs = 30_000) {
     encoding: 'utf8',
     timeout: timeoutMs,
     windowsHide: true,
+    cwd: root,
   });
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
   return {
@@ -182,6 +183,52 @@ function checkEnvFile() {
   };
 }
 
+/** Status container docker compose per service, dibaca sekali lalu dipakai ulang. */
+let composeServices;
+function readComposeServices() {
+  if (composeServices === undefined) {
+    const result = run('docker compose ps -a --format json', 20_000);
+    composeServices = result.ok
+      ? new Map(
+          result.output
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith('{'))
+            .map((line) => JSON.parse(line))
+            .map((container) => [container.Service, container]),
+        )
+      : null;
+  }
+  return composeServices;
+}
+
+function checkService(service, port) {
+  const fix =
+    'Jalankan `docker compose up -d --wait` (build pertama image emulator butuh beberapa menit).';
+  const services = readComposeServices();
+  if (services === null) {
+    return { status: WARN, detail: 'status tidak bisa dibaca (Docker mati?)', fix };
+  }
+  const container = services.get(service);
+  if (!container) {
+    return { status: WARN, detail: 'belum dijalankan', fix };
+  }
+  if (container.State !== 'running') {
+    return {
+      status: WARN,
+      detail: container.State,
+      fix: `${fix} Bila tetap gagal, lihat \`docker compose logs ${service}\`.`,
+    };
+  }
+  if (container.Health && container.Health !== 'healthy') {
+    return {
+      status: WARN,
+      detail: container.Health,
+      fix: `Tunggu sebentar, lalu lihat \`docker compose logs ${service}\` bila tidak kunjung healthy.`,
+    };
+  }
+  return { status: OK, detail: `healthy, port ${port}` };
+}
+
 const checks = [
   { name: 'Node.js', required: true, run: checkNode },
   { name: 'pnpm', required: true, run: checkPnpm },
@@ -190,6 +237,14 @@ const checks = [
   { name: 'Flutter', required: true, run: checkFlutter },
   { name: 'Android SDK', required: false, run: checkAndroid },
   { name: 'File .env', required: true, run: checkEnvFile },
+  // Layanan lokal opsional: prereq memeriksa lingkungan, bukan layanan yang sedang berjalan.
+  { name: 'PostgreSQL', required: false, run: () => checkService('postgres', 5432) },
+  { name: 'Auth Emulator', required: false, run: () => checkService('firebase-auth', 9099) },
+  {
+    name: 'Storage Emulator',
+    required: false,
+    run: () => checkService('firebase-storage', 9199),
+  },
 ];
 
 const rows = checks.map((check) => {
