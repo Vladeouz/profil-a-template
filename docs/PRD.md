@@ -8,7 +8,7 @@ Masalah yang diselesaikan: pada uji coba sebelumnya (repo `gym-membership`), ham
 
 Tujuan:
 
-- Clone baru bisa diverifikasi dengan tiga perintah: `pnpm doctor`, `docker compose up -d --wait`, `pnpm check`.
+- Clone baru bisa diverifikasi dengan tiga perintah: `pnpm prereq`, `docker compose up -d --wait`, `pnpm check`.
 - Satu fitur contoh (**notes**) menunjukkan pola lengkap dari database sampai UI Flutter, untuk ditiru lalu dihapus.
 - Tidak ada domain bisnis di template.
 
@@ -16,7 +16,7 @@ Tujuan:
 
 ### In scope
 
-- Root monorepo: workspace pnpm, konfigurasi versi, Biome, `.gitattributes`, `scripts/doctor.mjs`, `scripts/check.mjs`.
+- Root monorepo: workspace pnpm, konfigurasi versi, Biome, `.gitattributes`, `scripts/prereq.mjs`, `scripts/check.mjs`.
 - Layanan lokal lewat Docker Compose: PostgreSQL, Firebase Auth Emulator, Firebase Storage Emulator.
 - API Hono: konfigurasi env, format error, logger dengan redaksi, CORS, `/health`, autentikasi Firebase, `GET /v1/me`, pagination cursor, pg-boss, port `PushSender` dan `FileStorage`, fitur contoh notes.
 - Database: Drizzle, migrasi, database test terpisah.
@@ -52,13 +52,13 @@ Tujuan:
 ├── README.md
 ├── .gitattributes .gitignore .editorconfig .nvmrc
 ├── .env.example
-├── package.json               # script: doctor, check, dev, contract:generate, contract:check, init-project
+├── package.json               # script: prereq, check, dev, contract:generate, contract:check, init-project
 ├── pnpm-workspace.yaml
 ├── biome.json
 ├── docker-compose.yml
 ├── docker/firebase-emulator/Dockerfile
 ├── firebase.json .firebaserc storage.rules
-├── scripts/                   # doctor.mjs, check.mjs, init-project.mjs
+├── scripts/                   # prereq.mjs, check.mjs, init-project.mjs
 ├── .github/workflows/ci.yml
 ├── docs/
 │   ├── PRD.md TASKS.md        # dokumen proyek (template: placeholder)
@@ -120,7 +120,7 @@ Tujuan:
 
 ### Prasyarat lingkungan
 
-Diperiksa oleh `pnpm doctor`:
+Diperiksa oleh `pnpm prereq`:
 
 | Prasyarat | Wajib | Catatan |
 | --- | --- | --- |
@@ -212,13 +212,13 @@ Semua endpoint `/v1/*` mewajibkan header `Authorization: Bearer <Firebase ID tok
 
 ### FR-01: Cek prasyarat lingkungan
 
-`pnpm doctor` memeriksa setiap prasyarat di bagian 3, menampilkan tabel status, dan memberi perintah perbaikan.
+`pnpm prereq` memeriksa setiap prasyarat di bagian 3, menampilkan tabel status, dan memberi perintah perbaikan.
 
 Acceptance criteria:
-- [ ] Given semua prasyarat wajib terpenuhi, When `pnpm doctor` dijalankan, Then setiap baris berstatus OK dan exit code 0.
-- [ ] Given Docker engine mati, When `pnpm doctor` dijalankan, Then baris Docker gagal dengan saran "jalankan Docker Desktop" dan exit code bukan 0.
-- [ ] Given `.env` tidak ada, When `pnpm doctor` dijalankan, Then muncul perintah untuk menyalin `.env.example`, tanpa membuat `.env` sendiri.
-- [ ] Given Flutter terpasang tetapi `dart` gagal dijalankan, When `pnpm doctor` dijalankan, Then pesannya menyebut kemungkinan Smart App Control.
+- [ ] Given semua prasyarat wajib terpenuhi, When `pnpm prereq` dijalankan, Then setiap baris berstatus OK dan exit code 0.
+- [ ] Given Docker engine mati, When `pnpm prereq` dijalankan, Then baris Docker gagal dengan saran "jalankan Docker Desktop" dan exit code bukan 0.
+- [ ] Given `.env` tidak ada, When `pnpm prereq` dijalankan, Then muncul perintah untuk menyalin `.env.example`, tanpa membuat `.env` sendiri.
+- [ ] Given Flutter terpasang tetapi `dart` gagal dijalankan, When `pnpm prereq` dijalankan, Then pesannya menyebut kemungkinan Smart App Control.
 
 Edge cases: prasyarat opsional yang tidak ada ditampilkan sebagai peringatan, bukan kegagalan.
 
@@ -381,6 +381,7 @@ Acceptance criteria:
 | D-11 | Organisasi dan tenancy tidak di template; polanya dijelaskan di `conventions.md` | Tidak semua proyek multi-user |
 | D-12 | Script otomatisasi dalam Node `.mjs` | Heredoc dan script shell gagal di Windows pada uji sebelumnya |
 | D-13 | Kode dari repo uji `gym-membership` menjadi rujukan untuk Docker Compose, logger, error, dan Drizzle | Sudah terbukti berjalan; format `details` diubah sesuai bagian 5 |
+| D-14 | Cek prasyarat bernama `pnpm prereq` (`scripts/prereq.mjs`), bukan `pnpm doctor`; nama script root tidak boleh sama dengan perintah bawaan pnpm (cek dengan `pnpm help <nama>`) | pnpm 12 punya perintah bawaan `pnpm doctor` yang selalu menang atas script `package.json`; ditemukan dan diputuskan user di T-001 |
 
 ### Open Questions
 
