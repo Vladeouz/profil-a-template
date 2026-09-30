@@ -14,7 +14,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `docker-compose.yml`, `docker/firebase-emulator/Dockerfile`, `firebase.json`, `.firebaserc`, `storage.rules`, `.env.example`, `scripts/prereq.mjs` (cek layanan opsional), `README.md`
   - done when: `docker compose up -d --wait` membuat ketiga layanan healthy; `curl http://localhost:9099/` berisi `"ready": true`; Storage Emulator merespons di port 9199; `storage.rules` menolak semua akses; waktu build pertama dan build ulang image emulator dicatat di log; `.env.example` berisi semua variabel yang dipakai sampai tahap ini
 
-- [ ] T-003 Spike kontrak: Hono → `openapi.json` → client Dart swagger_parser
+- [x] T-003 Spike kontrak: Hono → `openapi.json` → client Dart swagger_parser
   - layer: spike · depends_on: T-001 · refs: FR-10, D-01, D-02
   - files: `spikes/contract/` (sementara, dihapus di T-020)
   - done when: satu route `@hono/zod-openapi` dengan skema error bagian 5 PRD diekspor ke `openapi.json`; swagger_parser menghasilkan package Dart yang lolos `dart analyze`; satu unit test Dart men-deserialize contoh respons sukses dan error; hasil dicatat di log dengan rekomendasi tetap memakai D-02 atau pindah ke cadangan
