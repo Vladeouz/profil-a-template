@@ -23,8 +23,14 @@ Library dipin ke versi pasti (tanpa `^` atau `~`) saat pertama dipasang, lalu di
 | `tsx` | 4.23.15 | T-005 |
 | `vitest` | 5.0.2 | T-005 |
 | `@types/node` | 26.6.3 | T-005 |
+| `drizzle-orm` | 0.45.3 | T-006 |
+| `drizzle-kit` | 0.31.11 | T-006 |
+| `pg` | 8.23.0 | T-006 |
+| `@types/pg` | 8.23.1 | T-006 |
 
 Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`.
+
+pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila `pnpm add` menambah `minimumReleaseAgeExclude` ke `pnpm-workspace.yaml`, batalkan perubahan itu (`pnpm-workspace.yaml`, `pnpm-lock.yaml`, `package.json`) dan pin versi sebelumnya; jangan melonggarkan policy.
 
 ## Git
 
@@ -46,6 +52,7 @@ Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. P
 - Aturan lint: preset `recommended`. Format: spasi 2, lebar baris 100, LF, kutip tunggal, titik koma selalu.
 - Biome membaca `.gitignore` (`vcs.useIgnoreFile`), jadi file yang di-ignore Git tidak diperiksa.
 - `pnpm lint` untuk memeriksa, `pnpm format` untuk memperbaiki otomatis.
+- File hasil generate yang formatnya ditentukan generatornya dikecualikan lewat `files.includes` di `biome.json` (saat ini `apps/api/drizzle/meta`), agar tidak bentrok saat di-generate ulang.
 
 ## Lingkungan Flutter dan Android
 
@@ -74,6 +81,17 @@ Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan
 - Field `authorization`/`Authorization`, `token`, `idToken`, `email`, `phone` diredaksi menjadi `[REDACTED]` sampai kedalaman 4. Field sensitif baru ditambahkan ke `SENSITIVE_KEYS` beserta test-nya.
 - Log request hanya berisi method, path (tanpa query string), status, durasi, dan `requestId`. Header tidak pernah dicatat.
 
+## Database
+
+- Drizzle ORM + `pg` (node-postgres). Skema di `apps/api/src/db/schema/`, satu file per tabel, diekspor ulang dari `schema/index.ts`. Contoh: `apps/api/src/db/schema/users.ts`.
+- Tabel snake_case jamak; properti TypeScript camelCase dengan nama kolom ditulis eksplisit (`firebaseUid: text('firebase_uid')`).
+- Kolom bersama dari `schema/columns.ts`: `id()` (`uuid` default `gen_random_uuid()`), `createdAt()`, `updatedAt()` (`$onUpdate`, hanya berlaku lewat `db.update()` Drizzle), `timestamptz(nama)` untuk timestamp lain. Semua timestamp `timestamptz` dengan `mode: 'date'`; kolom `date` memakai `mode: 'string'`.
+- Constraint diberi nama eksplisit `<tabel>_<kolom>_<jenis>` (`users_firebase_uid_unique`, `users_email_lowercase_check`) agar test dan penanganan error bisa merujuknya. Enum ditulis sebagai `text` + `check`.
+- Migrasi: ubah skema → `pnpm --filter api db:generate --name <ringkas>` → commit file `apps/api/drizzle/NNNN_<ringkas>.sql` beserta `meta/`. Migrasi yang sudah di-commit tidak diedit. `db:generate` tanpa perubahan skema harus mencetak `No schema changes`.
+- `pnpm --filter api db:migrate` (`src/db/migrate.ts`) menerapkan migrasi ke `DATABASE_URL`; idempoten. Hanya butuh `DATABASE_URL` (`loadDatabaseUrl()`), bukan seluruh env server.
+- Koneksi dibuat lewat `createDb(url)` dari `src/db/client.ts` (mengembalikan `{ db, pool, close }`).
+- Tabel pg-boss ada di schema `pgboss`, dikelola pg-boss sendiri, bukan lewat migrasi Drizzle.
+
 ## Format error
 
 Bentuk dan daftar `ErrorCode` mengikuti PRD bagian 5. Implementasi di `apps/api/src/core/http/errors.ts` dan `error-codes.ts`.
@@ -87,16 +105,18 @@ Bentuk dan daftar `ErrorCode` mengikuti PRD bagian 5. Implementasi di `apps/api/
 ## Test API
 
 - Unit test di `apps/api/test/unit/`, mengikuti struktur `src/` (`src/core/http/errors.ts` → `test/unit/core/http/errors.test.ts`). Dijalankan `pnpm --filter api test`.
-- Integration test di `apps/api/test/int/` dengan akhiran `.int.test.ts` (mulai T-006).
+- Integration test di `apps/api/test/int/<area>/` dengan akhiran `.int.test.ts`, dijalankan `pnpm --filter api test:int` (butuh `docker compose up -d --wait`). Contoh: `test/int/db/schema.int.test.ts`.
+- Global setup `test/setup/db.ts` membuat ulang database `<nama database DATABASE_URL>_test` (default `template_test`) setiap run dan menjalankan migrasi yang di-commit. Database utama hanya dipakai untuk `DROP`/`CREATE DATABASE`; datanya tidak disentuh. Bila PostgreSQL tidak bisa dihubungi, pesan error menyebut Docker.
+- Setiap file integration test memanggil `const getDb = useTestDb();` (`test/helpers/db.ts`) di level atas: membuka pool ke database test dan men-`TRUNCATE` semua tabel `public` sebelum setiap test. File berjalan berurutan (`fileParallelism: false`).
+- Pelanggaran constraint diperiksa lewat SQLSTATE dan nama constraint (`23505` unique, `23514` check, `23503` FK).
 - `test/setup/env.ts` mengisi env default test tanpa menimpa nilai dari shell.
 - Test HTTP memanggil `app.request()` pada `createTestApp()`, bukan server sungguhan. Route khusus test didaftarkan di app hasil `createTestApp()` di dalam file test-nya (contoh: `test/unit/core/http/errors.test.ts`).
 - Log diperiksa dengan `createLogger({ level: 'info' }, stream)` memakai `Writable` yang menampung baris JSON (contoh: `test/unit/core/logger.test.ts`).
 
 ## Belum diisi
 
-- Database: T-006
 - Pagination: T-008
 - Clean Architecture API: T-011
 - Kontrak dan client Dart: T-012
 - Flutter: T-013 sampai T-016
-- Test: T-006 (integration test API), T-013 (Flutter)
+- Test: T-013 (Flutter)

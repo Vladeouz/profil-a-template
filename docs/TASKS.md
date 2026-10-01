@@ -31,7 +31,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/api/package.json`, `apps/api/tsconfig.json`, `apps/api/vitest.config.ts`, `apps/api/src/app.ts`, `apps/api/src/server.ts`, `apps/api/src/core/config/env.ts`, `apps/api/src/core/http/{errors,error-codes,context,cors}.ts`, `apps/api/src/core/logger.ts`, `apps/api/src/features/system/http/health.route.ts`, `apps/api/test/unit/**`, `apps/api/test/helpers/test-app.ts`, `apps/api/test/setup/env.ts`
   - done when: `pnpm --filter api test` dan `pnpm --filter api typecheck` lulus dengan test untuk setiap kriteria FR-04, termasuk bentuk `details` (`required`, path bersarang, `_root`) dan penolakan origin di luar `CORS_ORIGINS`; `GET /health` → `200 {"status":"ok"}` saat server dijalankan
 
-- [ ] T-006 Database: Drizzle, tabel `users`, migrasi, database test
+- [x] T-006 Database: Drizzle, tabel `users`, migrasi, database test
   - layer: db · depends_on: T-005 · refs: FR-05, D-13
   - files: `apps/api/drizzle.config.ts`, `apps/api/drizzle/**`, `apps/api/src/db/{client,migrate}.ts`, `apps/api/src/db/schema/{columns,users,index}.ts`, `apps/api/vitest.int.config.ts`, `apps/api/test/setup/db.ts`, `apps/api/test/int/db/schema.int.test.ts`
   - done when: `pnpm --filter api db:migrate` sukses dua kali; `pnpm --filter api test:int` lulus dan memverifikasi tabel `users`, unique `firebase_uid`, serta bahwa database utama tidak tersentuh; `drizzle-kit generate` ulang tidak menghasilkan perubahan

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { EnvError, loadEnv } from '../../../../src/core/config/env.js';
+import { EnvError, loadDatabaseUrl, loadEnv } from '../../../../src/core/config/env.js';
 
-const base = { CORS_ORIGINS: 'http://localhost:8081' };
+const DATABASE_URL = 'postgres://template:template@localhost:5432/template';
+const base = { CORS_ORIGINS: 'http://localhost:8081', DATABASE_URL };
 
 describe('loadEnv', () => {
   it('applies defaults', () => {
@@ -10,6 +11,7 @@ describe('loadEnv', () => {
       PORT: 3000,
       LOG_LEVEL: 'info',
       CORS_ORIGINS: ['http://localhost:8081'],
+      DATABASE_URL,
     });
   });
 
@@ -18,7 +20,10 @@ describe('loadEnv', () => {
   });
 
   it('splits CORS_ORIGINS on commas, trims, and normalizes to origins', () => {
-    const env = loadEnv({ CORS_ORIGINS: ' http://localhost:8081 , https://app.example.com/ ,' });
+    const env = loadEnv({
+      ...base,
+      CORS_ORIGINS: ' http://localhost:8081 , https://app.example.com/ ,',
+    });
 
     expect(env.CORS_ORIGINS).toEqual(['http://localhost:8081', 'https://app.example.com']);
   });
@@ -26,10 +31,16 @@ describe('loadEnv', () => {
   it('throws EnvError naming a missing required variable', () => {
     expect(() => loadEnv({})).toThrow(EnvError);
     expect(() => loadEnv({})).toThrow(/CORS_ORIGINS/);
+    expect(() => loadEnv({})).toThrow(/DATABASE_URL/);
   });
 
   it('throws naming every invalid variable', () => {
-    const invalid = { CORS_ORIGINS: 'not-a-url', PORT: '70000', LOG_LEVEL: 'loud' };
+    const invalid = {
+      CORS_ORIGINS: 'not-a-url',
+      PORT: '70000',
+      LOG_LEVEL: 'loud',
+      DATABASE_URL: 'mysql://localhost/x',
+    };
 
     let message = '';
     try {
@@ -40,9 +51,27 @@ describe('loadEnv', () => {
     expect(message).toContain('CORS_ORIGINS');
     expect(message).toContain('PORT');
     expect(message).toContain('LOG_LEVEL');
+    expect(message).toContain('DATABASE_URL');
   });
 
   it('rejects an empty CORS_ORIGINS list', () => {
-    expect(() => loadEnv({ CORS_ORIGINS: ' , ' })).toThrow(/CORS_ORIGINS/);
+    expect(() => loadEnv({ ...base, CORS_ORIGINS: ' , ' })).toThrow(/CORS_ORIGINS/);
+  });
+});
+
+describe('loadDatabaseUrl', () => {
+  it('reads only DATABASE_URL, without the other server variables', () => {
+    expect(loadDatabaseUrl({ DATABASE_URL })).toBe(DATABASE_URL);
+    expect(loadDatabaseUrl({ DATABASE_URL: 'postgresql://u:p@db:5432/app' })).toBe(
+      'postgresql://u:p@db:5432/app',
+    );
+  });
+
+  it('throws EnvError naming DATABASE_URL when missing or not a postgres URL', () => {
+    expect(() => loadDatabaseUrl({})).toThrow(EnvError);
+    expect(() => loadDatabaseUrl({})).toThrow(/DATABASE_URL/);
+    expect(() => loadDatabaseUrl({ DATABASE_URL: 'http://localhost:5432/x' })).toThrow(
+      /DATABASE_URL/,
+    );
   });
 });
