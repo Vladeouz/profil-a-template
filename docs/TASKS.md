@@ -26,7 +26,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
 
 ## Fase 1 — API
 
-- [ ] T-005 Kerangka API: env, error, logger, CORS, `/health`
+- [x] T-005 Kerangka API: env, error, logger, CORS, `/health`
   - layer: api · depends_on: T-002, T-003 · refs: FR-04, NFR-04, D-03, D-13
   - files: `apps/api/package.json`, `apps/api/tsconfig.json`, `apps/api/vitest.config.ts`, `apps/api/src/app.ts`, `apps/api/src/server.ts`, `apps/api/src/core/config/env.ts`, `apps/api/src/core/http/{errors,error-codes,context,cors}.ts`, `apps/api/src/core/logger.ts`, `apps/api/src/features/system/http/health.route.ts`, `apps/api/test/unit/**`, `apps/api/test/helpers/test-app.ts`, `apps/api/test/setup/env.ts`
   - done when: `pnpm --filter api test` dan `pnpm --filter api typecheck` lulus dengan test untuk setiap kriteria FR-04, termasuk bentuk `details` (`required`, path bersarang, `_root`) dan penolakan origin di luar `CORS_ORIGINS`; `GET /health` → `200 {"status":"ok"}` saat server dijalankan
