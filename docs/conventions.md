@@ -92,6 +92,17 @@ Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan
 - Setelah token valid, use case `syncUser` (`features/users/usecases/sync-user.ts`) melakukan upsert `users` (`ON CONFLICT (firebase_uid)`) dengan email lowercase, `display_name` dari klaim `name`, dan `last_seen_at`; token adalah sumber kebenaran email dan nama. Hasilnya tersedia di handler sebagai `c.var.user` (entity `User`).
 - Route terautentikasi memakai `security: bearerSecurity` dan `401: errorResponse(…)` di `createRoute`. Contoh: `apps/api/src/features/users/http/me.route.ts`.
 
+## Pagination
+
+Helper di `apps/api/src/core/http/pagination.ts`, contoh pemakaian di `apps/api/test/unit/core/http/pagination.test.ts` (route di T-011: `features/notes`).
+
+- Query `?limit=20&cursor=<opaque>`: pakai `PaginationQuerySchema` sebagai `request.query`, atau `PaginationQuerySchema.extend({ ... })` bila route punya filter. `limit` 1–100, default 20. Handler menerima `cursor` yang sudah di-decode (`{ createdAt, id }` atau `undefined`).
+- Cursor rusak → `422 VALIDATION_ERROR` dengan `details.cursor` (`custom`, `Invalid cursor`). Hanya bentuk kanonis hasil `encodeCursor` yang diterima.
+- Respons `{ items, nextCursor }` dengan skema `pageSchema(ItemSchema, '<Item>Page')`; nama kedua menjadi nama komponen OpenAPI dan kelas Dart. `nextCursor` `null` di halaman terakhir.
+- Cursor adalah base64url dari `createdAt|id`, urutan `created_at DESC, id DESC`. Repository mengambil `limit + 1` baris dengan kondisi `(created_at, id) < (cursor.createdAt, cursor.id)`, lalu `buildPage(rows, limit, positionOf)` membuang baris tambahan dan membentuk `nextCursor`.
+- **Presisi timestamp.** PostgreSQL menyimpan `created_at` sampai mikrodetik, sedangkan `Date` hanya milidetik. Cursor yang dibuat dari `Date` bisa membuat baris terakhir muncul lagi di halaman berikutnya. `createdAt` di cursor berupa string ISO 8601 UTC dengan 0–6 digit pecahan, jadi repository memberi `positionOf` nilai `created_at` dengan presisi penuh dari database (atau memakai kolom berpresisi milidetik); diputuskan di T-011.
+- Jangan menambah `.openapi()` pada `limit`: override itu menghapus `minimum`, `maximum`, dan `default` dari OpenAPI (dijaga test).
+
 ## Database
 
 - Drizzle ORM + `pg` (node-postgres). Skema di `apps/api/src/db/schema/`, satu file per tabel, diekspor ulang dari `schema/index.ts`. Contoh: `apps/api/src/db/schema/users.ts`.
@@ -128,7 +139,6 @@ Bentuk dan daftar `ErrorCode` mengikuti PRD bagian 5. Implementasi di `apps/api/
 
 ## Belum diisi
 
-- Pagination: T-008
 - Clean Architecture API: T-011
 - Kontrak dan client Dart: T-012
 - Flutter: T-013 sampai T-016

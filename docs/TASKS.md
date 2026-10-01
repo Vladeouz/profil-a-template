@@ -41,7 +41,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/api/src/core/auth/{firebase-admin,authenticate}.ts`, `apps/api/src/features/users/**`, `apps/api/test/helpers/emulator-token.ts`, `apps/api/test/int/users/**`, `apps/api/test/int/security/all-routes-require-auth.int.test.ts`
   - done when: `pnpm --filter api test:int` lulus untuk setiap kriteria FR-06 memakai token dari Auth Emulator, termasuk dua request pertama paralel; test NFR-03 mengiterasi semua route `/v1/*` yang terdaftar dan memastikan semuanya `401` tanpa token
 
-- [ ] T-008 Helper pagination cursor
+- [x] T-008 Helper pagination cursor
   - layer: api · depends_on: T-005 · refs: FR-09
   - files: `apps/api/src/core/http/pagination.ts`, `apps/api/test/unit/core/http/pagination.test.ts`
   - done when: unit test membuktikan encode/decode cursor bolak-balik, `limit` default 20 dan batas 1–100, cursor rusak menghasilkan `422` dengan `details.cursor`, dan skema query serta respons `{ items, nextCursor }` bisa dipakai ulang oleh route mana pun
