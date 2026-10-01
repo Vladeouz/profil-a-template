@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { EnvError, loadDatabaseUrl, loadEnv } from '../../../../src/core/config/env.js';
 
 const DATABASE_URL = 'postgres://template:template@localhost:5432/template';
-const base = { CORS_ORIGINS: 'http://localhost:8081', DATABASE_URL };
+const base = {
+  CORS_ORIGINS: 'http://localhost:8081',
+  DATABASE_URL,
+  FIREBASE_PROJECT_ID: 'demo-template',
+};
 
 describe('loadEnv', () => {
   it('applies defaults', () => {
@@ -12,6 +16,7 @@ describe('loadEnv', () => {
       LOG_LEVEL: 'info',
       CORS_ORIGINS: ['http://localhost:8081'],
       DATABASE_URL,
+      FIREBASE_PROJECT_ID: 'demo-template',
     });
   });
 
@@ -32,6 +37,7 @@ describe('loadEnv', () => {
     expect(() => loadEnv({})).toThrow(EnvError);
     expect(() => loadEnv({})).toThrow(/CORS_ORIGINS/);
     expect(() => loadEnv({})).toThrow(/DATABASE_URL/);
+    expect(() => loadEnv({})).toThrow(/FIREBASE_PROJECT_ID/);
   });
 
   it('throws naming every invalid variable', () => {
@@ -52,6 +58,35 @@ describe('loadEnv', () => {
     expect(message).toContain('PORT');
     expect(message).toContain('LOG_LEVEL');
     expect(message).toContain('DATABASE_URL');
+  });
+
+  it('accepts FIREBASE_AUTH_EMULATOR_HOST as host:port', () => {
+    expect(
+      loadEnv({ ...base, FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' })
+        .FIREBASE_AUTH_EMULATOR_HOST,
+    ).toBe('localhost:9099');
+    expect(
+      loadEnv({ ...base, FIREBASE_AUTH_EMULATOR_HOST: 'firebase-auth:9099' })
+        .FIREBASE_AUTH_EMULATOR_HOST,
+    ).toBe('firebase-auth:9099');
+  });
+
+  it.each(['http://localhost:9099', 'localhost', 'localhost:port'])(
+    'rejects FIREBASE_AUTH_EMULATOR_HOST=%s',
+    (value) => {
+      expect(() => loadEnv({ ...base, FIREBASE_AUTH_EMULATOR_HOST: value })).toThrow(
+        /FIREBASE_AUTH_EMULATOR_HOST/,
+      );
+    },
+  );
+
+  it('rejects FIREBASE_AUTH_EMULATOR_HOST when NODE_ENV=production', () => {
+    const production = { ...base, NODE_ENV: 'production' };
+
+    expect(loadEnv(production).FIREBASE_AUTH_EMULATOR_HOST).toBeUndefined();
+    expect(() => loadEnv({ ...production, FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' })).toThrow(
+      /FIREBASE_AUTH_EMULATOR_HOST/,
+    );
   });
 
   it('rejects an empty CORS_ORIGINS list', () => {

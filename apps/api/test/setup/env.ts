@@ -5,6 +5,9 @@ const defaults: Record<string, string> = {
   CORS_ORIGINS: 'http://localhost:8081',
   // Database utama lokal (docker compose). Integration test memakai `<nama>_test` (test/setup/db.ts).
   DATABASE_URL: 'postgres://template:template@localhost:5432/template',
+  // Auth Emulator lokal (docker compose). Integration test membuat token lewat test/helpers/emulator-token.ts.
+  FIREBASE_PROJECT_ID: 'demo-template',
+  FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
 };
 
 for (const [key, value] of Object.entries(defaults)) {

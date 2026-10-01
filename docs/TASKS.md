@@ -36,7 +36,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/api/drizzle.config.ts`, `apps/api/drizzle/**`, `apps/api/src/db/{client,migrate}.ts`, `apps/api/src/db/schema/{columns,users,index}.ts`, `apps/api/vitest.int.config.ts`, `apps/api/test/setup/db.ts`, `apps/api/test/int/db/schema.int.test.ts`
   - done when: `pnpm --filter api db:migrate` sukses dua kali; `pnpm --filter api test:int` lulus dan memverifikasi tabel `users`, unique `firebase_uid`, serta bahwa database utama tidak tersentuh; `drizzle-kit generate` ulang tidak menghasilkan perubahan
 
-- [ ] T-007 Autentikasi Firebase, upsert `users`, dan `GET /v1/me`
+- [x] T-007 Autentikasi Firebase, upsert `users`, dan `GET /v1/me`
   - layer: api · depends_on: T-006 · refs: FR-06, NFR-03
   - files: `apps/api/src/core/auth/{firebase-admin,authenticate}.ts`, `apps/api/src/features/users/**`, `apps/api/test/helpers/emulator-token.ts`, `apps/api/test/int/users/**`, `apps/api/test/int/security/all-routes-require-auth.int.test.ts`
   - done when: `pnpm --filter api test:int` lulus untuk setiap kriteria FR-06 memakai token dari Auth Emulator, termasuk dua request pertama paralel; test NFR-03 mengiterasi semua route `/v1/*` yang terdaftar dan memastikan semuanya `401` tanpa token

@@ -1,7 +1,9 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
+import { createFirebaseAdmin, createFirebaseTokenVerifier } from './core/auth/firebase-admin.js';
 import { type Env, EnvError, loadEnv } from './core/config/env.js';
 import { createLogger } from './core/logger.js';
+import { createDb } from './db/client.js';
 
 function readEnv(): Env {
   try {
@@ -18,20 +20,32 @@ function readEnv(): Env {
 
 const env = readEnv();
 const logger = createLogger({ level: env.LOG_LEVEL });
-const app = createApp({ logger, corsOrigins: env.CORS_ORIGINS });
+const database = createDb(env.DATABASE_URL);
+const firebase = createFirebaseAdmin(env.FIREBASE_PROJECT_ID);
+const app = createApp({
+  logger,
+  corsOrigins: env.CORS_ORIGINS,
+  db: database.db,
+  tokenVerifier: createFirebaseTokenVerifier(firebase.auth),
+});
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
-  logger.info({ port: info.port, nodeEnv: env.NODE_ENV }, 'API listening');
+  logger.info(
+    {
+      port: info.port,
+      nodeEnv: env.NODE_ENV,
+      authEmulator: env.FIREBASE_AUTH_EMULATOR_HOST ?? null,
+    },
+    'API listening',
+  );
 });
 
 function shutdown(signal: NodeJS.Signals): void {
   logger.info({ signal }, 'shutting down');
-  server.close((err) => {
-    if (err) {
-      logger.error({ err }, 'failed to close server');
-      process.exit(1);
-    }
-    process.exit(0);
+  server.close(async (err) => {
+    if (err) logger.error({ err }, 'failed to close server');
+    await Promise.allSettled([database.close(), firebase.close()]);
+    process.exit(err ? 1 : 0);
   });
 }
 

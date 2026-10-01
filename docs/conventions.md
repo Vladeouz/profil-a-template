@@ -27,8 +27,9 @@ Library dipin ke versi pasti (tanpa `^` atau `~`) saat pertama dipasang, lalu di
 | `drizzle-kit` | 0.31.11 | T-006 |
 | `pg` | 8.23.0 | T-006 |
 | `@types/pg` | 8.23.1 | T-006 |
+| `firebase-admin` | 14.5.0 | T-007 |
 
-Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`.
+Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`. Build script yang tidak dibutuhkan didaftarkan dengan nilai `false` beserta alasannya di komentar (saat ini `@firebase/util` dan `protobufjs`, dependency `firebase-admin`); jangan biarkan nilai placeholder `set this to true or false` yang ditulis pnpm.
 
 pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila `pnpm add` menambah `minimumReleaseAgeExclude` ke `pnpm-workspace.yaml`, batalkan perubahan itu (`pnpm-workspace.yaml`, `pnpm-lock.yaml`, `package.json`) dan pin versi sebelumnya; jangan melonggarkan policy.
 
@@ -66,13 +67,15 @@ Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan
 - Prefix `/v1` untuk semua endpoint kecuali `/health`; resource jamak; JSON camelCase; timestamp ISO 8601 UTC berakhiran `Z`; tanggal kalender `YYYY-MM-DD`.
 - `src/app.ts` merakit app lewat `createApp(deps)` tanpa membaca `process.env`; `src/server.ts` satu-satunya tempat yang memanggil `loadEnv()` dan `serve()`. Test memakai `createTestApp()` (`test/helpers/test-app.ts`).
 - Route didefinisikan dengan `createRoute` dari `@hono/zod-openapi` dan didaftarkan lewat fungsi `registerXxxRoutes(app)` di `features/<fitur>/http/<nama>.route.ts`. Setiap route punya `operationId`; skema yang diekspor diberi nama `.openapi('Nama')`. Contoh: `apps/api/src/features/system/http/health.route.ts`.
-- Urutan middleware: `requestId` → `requestLogger` → `cors`, lalu `onError` dan `notFound`.
+- Urutan middleware: `requestId` → `requestLogger` → `cors`, lalu `onError` dan `notFound`; route publik (`/health`) didaftarkan sebelum `authenticate` di `/v1/*`.
+- Dependency luar (database, verifier token) masuk lewat `AppDeps`; `createApp` merakit repository dan use case (composition root). Contoh: `apps/api/src/app.ts`.
 
 ### Env
 
 - Divalidasi Zod di `apps/api/src/core/config/env.ts`. Env salah atau hilang membuat server keluar dengan exit code 1 dan pesan yang menyebut nama variabelnya.
 - Setiap variabel baru ditambahkan bersamaan ke skema `env.ts`, `.env.example`, dan `test/setup/env.ts` (default untuk test).
 - `pnpm --filter api dev` dan `start` membaca `../../.env` lewat `--env-file-if-exists`; variabel yang sudah di-set di shell menang.
+- `FIREBASE_PROJECT_ID` wajib. `FIREBASE_AUTH_EMULATOR_HOST` (`host:port`) opsional; bila di-set, firebase-admin memverifikasi token ke Auth Emulator. Ditolak bila `NODE_ENV=production`.
 - `CORS_ORIGINS` wajib, daftar origin dipisah koma (misalnya `http://localhost:8081` untuk Flutter web). Origin lain tidak mendapat `Access-Control-Allow-Origin`. Lihat `apps/api/src/core/http/cors.ts`.
 
 ### Logger
@@ -80,6 +83,14 @@ Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan
 - pino, JSON ke stdout (`apps/api/src/core/logger.ts`). Di handler pakai `c.var.log` (child logger dengan `requestId`).
 - Field `authorization`/`Authorization`, `token`, `idToken`, `email`, `phone` diredaksi menjadi `[REDACTED]` sampai kedalaman 4. Field sensitif baru ditambahkan ke `SENSITIVE_KEYS` beserta test-nya.
 - Log request hanya berisi method, path (tanpa query string), status, durasi, dan `requestId`. Header tidak pernah dicatat.
+
+## Autentikasi
+
+- Semua route `/v1/*` dilindungi middleware `authenticate` (`apps/api/src/core/auth/authenticate.ts`) yang dipasang sekali di `app.ts` (`app.use('/v1/*', …)`); route tidak memasang auth sendiri. Route publik hanya di luar `/v1` dan wajib didaftarkan di `PUBLIC_ROUTES` pada `test/int/security/all-routes-require-auth.int.test.ts`.
+- Header `Authorization: Bearer <ID token>`. Header tidak ada atau bukan Bearer → `401` `Missing bearer token`; token tidak valid, kedaluwarsa, atau untuk project lain → `401` `Invalid or expired token`. Kegagalan verifikasi yang bukan kesalahan token (`auth/internal-error`, misalnya sertifikat Google tidak bisa diambil) → `500`.
+- Verifikasi lewat port `TokenVerifier` (`core/auth/firebase-admin.ts`), implementasinya `createFirebaseTokenVerifier(auth)`. firebase-admin diinisialisasi dengan `projectId` saja (tanpa service account) lewat `createFirebaseAdmin(projectId)` dengan nama app unik.
+- Setelah token valid, use case `syncUser` (`features/users/usecases/sync-user.ts`) melakukan upsert `users` (`ON CONFLICT (firebase_uid)`) dengan email lowercase, `display_name` dari klaim `name`, dan `last_seen_at`; token adalah sumber kebenaran email dan nama. Hasilnya tersedia di handler sebagai `c.var.user` (entity `User`).
+- Route terautentikasi memakai `security: bearerSecurity` dan `401: errorResponse(…)` di `createRoute`. Contoh: `apps/api/src/features/users/http/me.route.ts`.
 
 ## Database
 
@@ -110,6 +121,8 @@ Bentuk dan daftar `ErrorCode` mengikuti PRD bagian 5. Implementasi di `apps/api/
 - Setiap file integration test memanggil `const getDb = useTestDb();` (`test/helpers/db.ts`) di level atas: membuka pool ke database test dan men-`TRUNCATE` semua tabel `public` sebelum setiap test. File berjalan berurutan (`fileParallelism: false`).
 - Pelanggaran constraint diperiksa lewat SQLSTATE dan nama constraint (`23505` unique, `23514` check, `23503` FK).
 - `test/setup/env.ts` mengisi env default test tanpa menimpa nilai dari shell.
+- `createTestApp()` memakai `db` yang belum terkoneksi dan `rejectAllTokens`, jadi unit test tidak butuh Docker. Integration test yang butuh login memberi `db: getDb().db` dan `tokenVerifier: createEmulatorTokenVerifier()`.
+- Token login dibuat lewat Auth Emulator dengan `signUp()` / `updateAccount()` dari `test/helpers/emulator-token.ts` (email acak, emulator tidak dibersihkan). Token kedaluwarsa atau untuk project lain dibuat dengan `unsignedIdToken({ exp, aud, … })`. Contoh: `test/int/users/me.int.test.ts`.
 - Test HTTP memanggil `app.request()` pada `createTestApp()`, bukan server sungguhan. Route khusus test didaftarkan di app hasil `createTestApp()` di dalam file test-nya (contoh: `test/unit/core/http/errors.test.ts`).
 - Log diperiksa dengan `createLogger({ level: 'info' }, stream)` memakai `Writable` yang menampung baris JSON (contoh: `test/unit/core/logger.test.ts`).
 
