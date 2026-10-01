@@ -13,7 +13,7 @@ Rencana dan status pembangunan template ada di `docs/PRD.md` dan `docs/TASKS.md`
 | pnpm 12.6.0 | ya | dipin lewat `packageManager`; aktifkan dengan `corepack enable` |
 | Git | ya | |
 | Docker Desktop (engine hidup) | ya | |
-| Flutter stable | ya | di Windows, Smart App Control dapat memblokir `dart.exe` |
+| Flutter stable 3.47.5 (Dart 3.13.4) | ya | versi yang juga dipakai CI; di Windows, Smart App Control dapat memblokir `dart.exe` |
 | Android SDK + emulator | tidak | hanya untuk verifikasi Android |
 | File `.env` | ya | salin sendiri dari `.env.example` |
 

@@ -19,10 +19,10 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `spikes/contract/` (sementara, dihapus di T-020)
   - done when: satu route `@hono/zod-openapi` dengan skema error bagian 5 PRD diekspor ke `openapi.json`; swagger_parser menghasilkan package Dart yang lolos `dart analyze`; satu unit test Dart men-deserialize contoh respons sukses dan error; hasil dicatat di log dengan rekomendasi tetap memakai D-02 atau pindah ke cadangan
 
-- [ ] T-004 Spike Flutter + Firebase Auth Emulator dengan FirebaseOptions dummy
+- [x] T-004 Spike Flutter + Firebase Auth Emulator dengan FirebaseOptions dummy
   - layer: spike · depends_on: T-002 · refs: FR-12, D-04
   - files: `spikes/firebase_flutter/` (sementara, dihapus di T-020)
-  - done when: `flutter analyze` bersih; aplikasi spike membaca FirebaseOptions dummy dari `--dart-define-from-file`, memanggil `useAuthEmulator`, dan menyediakan tombol daftar dan login; **(manual)** user memastikan daftar dan login berhasil di Chrome dan di Android emulator (host `10.0.2.2`), dan akun muncul di emulator (`GET http://localhost:9099/emulator/v1/projects/demo-template/accounts`); versi Flutter dicatat di log dan README
+  - done when: `flutter analyze` bersih; aplikasi spike membaca FirebaseOptions dummy dari `--dart-define-from-file`, memanggil `useAuthEmulator`, dan menyediakan tombol daftar dan login; **(manual)** user memastikan daftar dan login berhasil di Chrome dan di Android emulator (host `10.0.2.2`), dan akun muncul di emulator (`POST http://localhost:9099/identitytoolkit.googleapis.com/v1/projects/demo-template/accounts:query` dengan header `Authorization: Bearer owner` dan body `{}`); versi Flutter dicatat di log dan README
 
 ## Fase 1 — API
 

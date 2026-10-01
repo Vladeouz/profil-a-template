@@ -5,7 +5,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -101,17 +101,29 @@ function checkDocker() {
   return { status: OK, detail: `engine ${firstLine(engine.output)}` };
 }
 
+/** Hasil `flutter --version --machine`, dibaca sekali lalu dipakai ulang. */
+let flutterInfo;
+function readFlutterInfo() {
+  if (flutterInfo === undefined) {
+    const flutter = run('flutter --version --machine', 120_000);
+    if (!flutter.ok) {
+      flutterInfo = { error: 'flutter tidak ditemukan atau gagal dijalankan' };
+    } else {
+      try {
+        flutterInfo = JSON.parse(flutter.output.slice(flutter.output.indexOf('{')));
+      } catch {
+        flutterInfo = { error: 'output `flutter --version` tidak dikenali' };
+      }
+    }
+  }
+  return flutterInfo;
+}
+
 function checkFlutter() {
   const install = 'Pasang Flutter channel stable: https://docs.flutter.dev/get-started/install.';
-  const flutter = run('flutter --version --machine', 120_000);
-  if (!flutter.ok) {
-    return { status: FAIL, detail: 'flutter tidak ditemukan atau gagal dijalankan', fix: install };
-  }
-  let info;
-  try {
-    info = JSON.parse(flutter.output.slice(flutter.output.indexOf('{')));
-  } catch {
-    return { status: FAIL, detail: 'output `flutter --version` tidak dikenali', fix: install };
+  const info = readFlutterInfo();
+  if (info.error) {
+    return { status: FAIL, detail: info.error, fix: install };
   }
   if (info.channel !== 'stable') {
     return {
@@ -146,8 +158,12 @@ function androidSdkCandidates() {
   return [...fromEnv, ...defaults.filter(Boolean)];
 }
 
+function findAndroidSdk() {
+  return androidSdkCandidates().find((path) => existsSync(path));
+}
+
 function checkAndroid() {
-  const sdk = androidSdkCandidates().find((path) => existsSync(path));
+  const sdk = findAndroidSdk();
   if (!sdk) {
     return {
       status: WARN,
@@ -164,6 +180,102 @@ function checkAndroid() {
     };
   }
   return { status: OK, detail: sdk };
+}
+
+// compileSdk plugin firebase_core dan firebase_auth (`android/local-config.gradle` di package-nya).
+const FIREBASE_PLUGIN_COMPILE_SDK = 34;
+// Dipakai bila FlutterExtension.kt tidak bisa dibaca; nilai dari Flutter 3.47.5.
+const FLUTTER_ANDROID_DEFAULTS = { ndkVersion: '28.2.13676358', compileSdkVersion: 36 };
+
+/** Versi NDK dan compileSdk bawaan Flutter, dibaca dari plugin Gradle di Flutter SDK. */
+function flutterAndroidVersions() {
+  const { flutterRoot } = readFlutterInfo();
+  const file =
+    flutterRoot &&
+    join(flutterRoot, 'packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt');
+  if (!file || !existsSync(file)) {
+    return FLUTTER_ANDROID_DEFAULTS;
+  }
+  const source = readFileSync(file, 'utf8');
+  const ndkVersion = source.match(/val ndkVersion: String = "([^"]+)"/)?.[1];
+  const compileSdkVersion = Number(source.match(/val compileSdkVersion: Int = (\d+)/)?.[1]);
+  return {
+    ndkVersion: ndkVersion ?? FLUTTER_ANDROID_DEFAULTS.ndkVersion,
+    compileSdkVersion: compileSdkVersion || FLUTTER_ANDROID_DEFAULTS.compileSdkVersion,
+  };
+}
+
+function checkAndroidPackages() {
+  const sdk = findAndroidSdk();
+  if (!sdk) {
+    return { status: WARN, detail: 'Android SDK tidak ditemukan (opsional)' };
+  }
+  const { ndkVersion, compileSdkVersion } = flutterAndroidVersions();
+  const platforms = [...new Set([FIREBASE_PLUGIN_COMPILE_SDK, compileSdkVersion])].sort(
+    (a, b) => a - b,
+  );
+  // Folder setengah jadi dari unduhan Gradle yang macet tidak dihitung: yang dicek file isinya.
+  const missing = [];
+  if (!existsSync(join(sdk, 'ndk', ndkVersion, 'source.properties'))) {
+    missing.push(`ndk/${ndkVersion}`);
+  }
+  for (const level of platforms) {
+    if (!existsSync(join(sdk, 'platforms', `android-${level}`, 'android.jar'))) {
+      missing.push(`platforms/android-${level}`);
+    }
+  }
+  const wanted = `NDK ${ndkVersion}, platform ${platforms.join(' dan ')}`;
+  if (missing.length === 0) {
+    return { status: OK, detail: wanted };
+  }
+  const bin = join(sdk, 'cmdline-tools', 'latest', 'bin');
+  const androidCli = join(bin, isWindows ? 'android.exe' : 'android');
+  // cmdline-tools baru: `android sdk install ndk/<versi>`; lama: `sdkmanager "ndk;<versi>"`.
+  const install = existsSync(androidCli)
+    ? `"${androidCli}" sdk install ${missing.join(' ')}`
+    : `"${join(bin, 'sdkmanager')}" ${missing.map((name) => `"${name.replace('/', ';')}"`).join(' ')}`;
+  return {
+    status: WARN,
+    detail: `belum terpasang: ${missing.join(', ')} (opsional)`,
+    fix:
+      `Pasang sebelum build Android pertama, karena Gradle bisa macet bila memasangnya sendiri: \`${install}\`, ` +
+      'atau lewat SDK Manager di Android Studio. Hapus dulu folder setengah jadi bila ada.',
+  };
+}
+
+/** Lokasi pub cache: `PUB_CACHE`, atau lokasi bawaan Dart. */
+function pubCachePath() {
+  if (process.env.PUB_CACHE) {
+    return process.env.PUB_CACHE;
+  }
+  return isWindows
+    ? process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Pub', 'Cache')
+    : join(homedir(), '.pub-cache');
+}
+
+function checkPubCacheDrive() {
+  const pubCache = pubCachePath();
+  if (!isWindows) {
+    return { status: OK, detail: pubCache };
+  }
+  if (!pubCache) {
+    return { status: WARN, detail: 'lokasi pub cache tidak diketahui (LOCALAPPDATA kosong)' };
+  }
+  // `D:\` → `D:`; path UNC tetap utuh sebagai root-nya.
+  const driveOf = (path) => win32.parse(win32.resolve(path)).root.replace(/\\$/, '').toUpperCase();
+  const repoDrive = driveOf(root);
+  if (repoDrive === driveOf(pubCache)) {
+    return { status: OK, detail: pubCache };
+  }
+  const suggestion = `${repoDrive}\\pub-cache`;
+  return {
+    status: WARN,
+    detail: `repo di drive ${repoDrive}, pub cache di ${pubCache}`,
+    fix:
+      'Bila repo dan pub cache beda drive, build Android gagal saat kompilasi Kotlin plugin ' +
+      `("this and base files have different roots"). Jalankan \`setx PUB_CACHE ${suggestion}\`, ` +
+      'buka terminal baru, lalu jalankan ulang `flutter pub get` di setiap proyek Flutter.',
+  };
 }
 
 function checkEnvFile() {
@@ -236,6 +348,8 @@ const checks = [
   { name: 'Docker', required: true, run: checkDocker },
   { name: 'Flutter', required: true, run: checkFlutter },
   { name: 'Android SDK', required: false, run: checkAndroid },
+  { name: 'Android NDK/Platform', required: false, run: checkAndroidPackages },
+  { name: 'Pub cache', required: false, run: checkPubCacheDrive },
   { name: 'File .env', required: true, run: checkEnvFile },
   // Layanan lokal opsional: prereq memeriksa lingkungan, bukan layanan yang sedang berjalan.
   { name: 'PostgreSQL', required: false, run: () => checkService('postgres', 5432) },
