@@ -85,7 +85,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/app/lib/features/notes/{domain,data}/**`, `apps/app/test/features/notes/{domain,data}/**`
   - done when: `flutter analyze` bersih; `flutter test` lulus untuk setiap use case (repository di-mock) dan untuk repository impl + mapper (data source di-mock), termasuk pemetaan `NOT_FOUND` dan `VALIDATION_ERROR` beserta `details` ke `Failure`
 
-- [ ] T-016 Fitur contoh notes (Flutter): presentation
+- [x] T-016 Fitur contoh notes (Flutter): presentation
   - layer: app · depends_on: T-015 · refs: FR-13
   - files: `apps/app/lib/features/notes/presentation/**`, `apps/app/test/features/notes/presentation/**`
   - done when: `flutter analyze` bersih; `bloc_test` untuk pagination, simpan, ubah, hapus, dan error jaringan lulus; widget test error validasi di field judul lulus; **(manual)** dengan API dan emulator berjalan, user memastikan alur daftar, buat, ubah, hapus, dan muat halaman berikutnya berjalan di Chrome dan Android emulator
