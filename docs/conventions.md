@@ -215,6 +215,12 @@ features/<fitur>/
 - Repository dibatasi pemilik: setiap metode menerima `userId` dan memfilter `user_id` di query yang sama (bukan ambil dulu lalu cek), lalu mengembalikan `null`/`false` bila tidak ada atau milik user lain. Use case mengubahnya menjadi `AppError('NOT_FOUND', ...)` (D-07: `404`, bukan `403`).
 - `createApp()` di `src/app.ts` adalah composition root: buat repository dari `db`, rakit use case, lalu `registerXxxRoutes(app, { ...useCases })`. Route menerima use case lewat parameter, bukan membuatnya sendiri.
 - Route: path param `id` divalidasi `z.uuid()` (bukan UUID → `422 details.id`); body POST/PATCH memakai `request.body.required: true`; PATCH memakai skema dengan semua field opsional + `.refine()` minimal satu field (→ `details._root`); `DELETE` mengembalikan `c.body(null, 204)`. Skema request dan respons diberi nama `.openapi('Note')`, `'CreateNoteInput'`, `'UpdateNoteInput'`, `'NotePage'`.
+- Teks wajib yang tidak boleh kosong memakai `.trim()` sebelum `.min()`/`.max()` (`z.string().trim().min(1).max(TITLE_MAX)`): teks berisi spasi saja → `422` `too_small`, nilai yang disimpan sudah dirapikan, dan panjang dihitung setelah dirapikan. Contoh: `Title` di `features/notes/http/notes.route.ts`, dijaga `test/int/notes/notes.int.test.ts`.
+
+### Aturan bisnis: API vs client
+
+- Aturan bisnis (wajib diisi, batas panjang, keunikan, hak akses, minimal satu field) ditegakkan di API: skema Zod route, use case, dan constraint database. API adalah satu-satunya sumber kebenaran dan harus aman walau client mengirim input apa pun.
+- Client (Flutter) boleh menormalisasi input sebelum dikirim (misalnya `trim` judul atau email) dan boleh menampilkan validasi lokal yang sama dengan API untuk umpan balik cepat, tetapi **tidak boleh lebih ketat dari API**: input yang diterima API tidak boleh ditolak client. Bila aturan berubah, ubah API dulu; error validasi API (`details`) tetap ditampilkan per field.
 
 ## Kontrak dan client Dart
 

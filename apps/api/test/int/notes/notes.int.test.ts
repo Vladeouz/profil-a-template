@@ -231,6 +231,7 @@ describe('pagination', () => {
 describe('validasi (422 VALIDATION_ERROR)', () => {
   it.each([
     ['title kosong', { title: '' }, 'too_small'],
+    ['title hanya spasi', { title: ' \t\n ' }, 'too_small'],
     ['title lebih dari 120 karakter', { title: 'x'.repeat(121) }, 'too_big'],
     ['title tidak dikirim', { body: 'Isi' }, 'required'],
   ])('POST dengan %s → details.title', async (_name, body, code) => {
@@ -242,6 +243,15 @@ describe('validasi (422 VALIDATION_ERROR)', () => {
     const error = await errorOf(res);
     expect(error.code).toBe('VALIDATION_ERROR');
     expect(error.details?.title).toEqual([expect.objectContaining({ code })]);
+  });
+
+  it('title dirapikan sebelum disimpan dan sebelum cek panjang', async () => {
+    const a = await login();
+
+    const res = await a.send('POST', '/v1/notes', { title: `  ${'x'.repeat(120)}  ` });
+
+    expect(res.status).toBe(201);
+    expect((await json<NoteDto>(res)).title).toBe('x'.repeat(120));
   });
 
   it('POST dengan title tepat 120 karakter dan body 5000 karakter diterima', async () => {
@@ -299,6 +309,20 @@ describe('validasi (422 VALIDATION_ERROR)', () => {
 
     expect(res.status).toBe(422);
     expect(Object.keys((await errorOf(res)).details ?? {})).toEqual(['title']);
+  });
+
+  it('PATCH dengan title hanya spasi → details.title dan note tidak berubah', async () => {
+    const a = await login();
+    const note = await createNote(a, { title: 'Judul' });
+
+    const res = await a.send('PATCH', `/v1/notes/${note.id}`, { title: '   ' });
+
+    expect(res.status).toBe(422);
+    expect((await errorOf(res)).details?.title).toEqual([
+      expect.objectContaining({ code: 'too_small' }),
+    ]);
+    const after = await a.send('GET', `/v1/notes/${note.id}`);
+    expect((await json<NoteDto>(after)).title).toBe('Judul');
   });
 
   it('cursor rusak → details.cursor', async () => {

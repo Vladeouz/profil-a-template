@@ -14,7 +14,8 @@ import type { UpdateNote } from '../usecases/update-note.js';
 export const TITLE_MAX = 120;
 export const BODY_MAX = 5000;
 
-const Title = z.string().min(1).max(TITLE_MAX).openapi({ example: 'Belanja mingguan' });
+// Spasi di tepi dibuang sebelum cek panjang: judul berisi spasi saja → 422 `too_small`.
+const Title = z.string().trim().min(1).max(TITLE_MAX).openapi({ example: 'Belanja mingguan' });
 const Body = z.string().max(BODY_MAX).openapi({ example: 'Beras, telur, sayur' });
 
 export const NoteSchema = z
