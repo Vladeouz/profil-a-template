@@ -7,6 +7,7 @@ import type { AppEnv } from './core/http/context.js';
 import { cors } from './core/http/cors.js';
 import { createErrorHandler, notFoundHandler, validationHook } from './core/http/errors.js';
 import { requestLogger } from './core/logger.js';
+import type { Ports } from './core/ports/create-ports.js';
 import type { Database } from './db/client.js';
 import { registerHealthRoutes } from './features/system/http/health.route.js';
 import { registerUserRoutes } from './features/users/http/me.route.js';
@@ -18,6 +19,9 @@ export type AppDeps = {
   corsOrigins: readonly string[];
   db: Database;
   tokenVerifier: TokenVerifier;
+  // Port push dan storage (D-06) untuk use case fitur; dirakit di sini seperti repository.
+  // Belum ada fitur template yang memakainya.
+  ports: Ports;
 };
 
 export function createApp({

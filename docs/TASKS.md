@@ -51,7 +51,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/api/src/core/jobs/{boss,heartbeat.job}.ts`, `apps/api/src/server.ts`, `apps/api/test/int/jobs/**`
   - done when: `pnpm --filter api test:int` membuktikan job dikirim lalu diproses handler, pg-boss tidak start tanpa `RUN_WORKER=true`, dan urutan shutdown (berhenti menerima request, stop pg-boss, keluar) teruji lewat fungsi shutdown yang dipanggil langsung di test
 
-- [ ] T-010 Port `PushSender` dan `FileStorage` dengan adapter
+- [x] T-010 Port `PushSender` dan `FileStorage` dengan adapter
   - layer: api · depends_on: T-005 · refs: FR-08, D-06
   - files: `apps/api/src/core/ports/{push-sender,file-storage}.ts`, `apps/api/src/core/ports/adapters/{fake-push,fcm-push,fake-storage,firebase-storage}.ts`, `apps/api/test/unit/core/ports/**`, `apps/api/test/int/ports/firebase-storage.int.test.ts`
   - done when: unit test untuk adapter palsu dan adapter FCM (firebase-admin di-mock) lulus; integration test menyimpan, membaca, dan menghapus file lewat Storage Emulator lulus; pemilihan adapter lewat env (`PUSH_ADAPTER`, `STORAGE_ADAPTER`) teruji

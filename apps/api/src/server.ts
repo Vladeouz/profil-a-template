@@ -5,6 +5,7 @@ import { type Env, EnvError, loadEnv } from './core/config/env.js';
 import { startBoss } from './core/jobs/boss.js';
 import { heartbeatJob } from './core/jobs/heartbeat.job.js';
 import { createLogger } from './core/logger.js';
+import { createPorts } from './core/ports/create-ports.js';
 import { createShutdown } from './core/shutdown.js';
 import { createDb } from './db/client.js';
 
@@ -30,7 +31,19 @@ const app = createApp({
   corsOrigins: env.CORS_ORIGINS,
   db: database.db,
   tokenVerifier: createFirebaseTokenVerifier(firebase.auth),
+  ports: createPorts(env, firebase.app),
 });
+
+// Adapter palsu tidak mengirim push dan tidak menyimpan file secara permanen.
+if (
+  env.NODE_ENV === 'production' &&
+  (env.PUSH_ADAPTER === 'fake' || env.STORAGE_ADAPTER === 'fake')
+) {
+  logger.warn(
+    { pushAdapter: env.PUSH_ADAPTER, storageAdapter: env.STORAGE_ADAPTER },
+    'fake port adapter in production',
+  );
+}
 
 let boss: Awaited<ReturnType<typeof startBoss>>;
 try {
@@ -53,6 +66,9 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
       nodeEnv: env.NODE_ENV,
       authEmulator: env.FIREBASE_AUTH_EMULATOR_HOST ?? null,
       worker: boss !== null,
+      pushAdapter: env.PUSH_ADAPTER,
+      storageAdapter: env.STORAGE_ADAPTER,
+      storageEmulator: env.FIREBASE_STORAGE_EMULATOR_HOST ?? null,
     },
     'API listening',
   );

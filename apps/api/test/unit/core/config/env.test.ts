@@ -18,7 +18,48 @@ describe('loadEnv', () => {
       DATABASE_URL,
       FIREBASE_PROJECT_ID: 'demo-template',
       RUN_WORKER: false,
+      PUSH_ADAPTER: 'fake',
+      STORAGE_ADAPTER: 'fake',
     });
+  });
+
+  it('accepts the push and storage adapters', () => {
+    const env = loadEnv({
+      ...base,
+      PUSH_ADAPTER: 'fcm',
+      STORAGE_ADAPTER: 'firebase',
+      FIREBASE_STORAGE_BUCKET: 'demo-template.appspot.com',
+    });
+
+    expect(env.PUSH_ADAPTER).toBe('fcm');
+    expect(env.STORAGE_ADAPTER).toBe('firebase');
+    expect(env.FIREBASE_STORAGE_BUCKET).toBe('demo-template.appspot.com');
+  });
+
+  it.each([
+    ['PUSH_ADAPTER', 'firebase'],
+    ['PUSH_ADAPTER', ''],
+    ['STORAGE_ADAPTER', 's3'],
+    ['STORAGE_ADAPTER', 'FAKE'],
+  ])('rejects %s=%j', (key, value) => {
+    expect(() => loadEnv({ ...base, [key]: value })).toThrow(new RegExp(key));
+  });
+
+  it('requires FIREBASE_STORAGE_BUCKET when STORAGE_ADAPTER=firebase', () => {
+    expect(() => loadEnv({ ...base, STORAGE_ADAPTER: 'firebase' })).toThrow(
+      /FIREBASE_STORAGE_BUCKET/,
+    );
+    expect(() => loadEnv({ ...base, STORAGE_ADAPTER: 'fake' })).not.toThrow();
+  });
+
+  it('accepts FIREBASE_STORAGE_EMULATOR_HOST as host:port', () => {
+    expect(
+      loadEnv({ ...base, FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' })
+        .FIREBASE_STORAGE_EMULATOR_HOST,
+    ).toBe('localhost:9199');
+    expect(() =>
+      loadEnv({ ...base, FIREBASE_STORAGE_EMULATOR_HOST: 'http://localhost:9199' }),
+    ).toThrow(/FIREBASE_STORAGE_EMULATOR_HOST/);
   });
 
   it('parses RUN_WORKER as a boolean, false when unset', () => {
@@ -90,6 +131,16 @@ describe('loadEnv', () => {
       );
     },
   );
+
+  it('rejects FIREBASE_STORAGE_EMULATOR_HOST when NODE_ENV=production', () => {
+    expect(() =>
+      loadEnv({
+        ...base,
+        NODE_ENV: 'production',
+        FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+      }),
+    ).toThrow(/FIREBASE_STORAGE_EMULATOR_HOST/);
+  });
 
   it('rejects FIREBASE_AUTH_EMULATOR_HOST when NODE_ENV=production', () => {
     const production = { ...base, NODE_ENV: 'production' };

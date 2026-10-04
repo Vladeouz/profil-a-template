@@ -14,7 +14,7 @@ const OriginList = z
 // URL koneksi PostgreSQL, misalnya `postgres://template:template@localhost:5432/template`.
 const DatabaseUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
-// `host:port` Auth Emulator, misalnya `localhost:9099`. firebase-admin membacanya langsung dari
+// `host:port` emulator Firebase, misalnya `localhost:9099`. firebase-admin membacanya langsung dari
 // `process.env`; divalidasi di sini agar salah ketik terlihat saat start.
 const EmulatorHost = z.string().regex(/^[^:/\s]+:\d+$/, 'Expected host:port, e.g. localhost:9099');
 
@@ -31,13 +31,38 @@ const EnvObject = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  // D-06: adapter port push dan storage (`src/core/ports/create-ports.ts`).
+  PUSH_ADAPTER: z.enum(['fake', 'fcm']).default('fake'),
+  STORAGE_ADAPTER: z.enum(['fake', 'firebase']).default('fake'),
+  // Nama bucket, misalnya `demo-template.appspot.com`. Wajib bila STORAGE_ADAPTER=firebase.
+  FIREBASE_STORAGE_BUCKET: z.string().min(1).optional(),
+  FIREBASE_STORAGE_EMULATOR_HOST: EmulatorHost.optional(),
 });
 
-// Dengan emulator, firebase-admin menerima token tanpa tanda tangan; jangan pernah di produksi.
-const EnvSchema = EnvObject.refine(
-  (env) => !(env.NODE_ENV === 'production' && env.FIREBASE_AUTH_EMULATOR_HOST),
-  { path: ['FIREBASE_AUTH_EMULATOR_HOST'], message: 'Must not be set when NODE_ENV=production' },
-);
+const EMULATOR_HOSTS = ['FIREBASE_AUTH_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST'] as const;
+
+const EnvSchema = EnvObject.superRefine((env, ctx) => {
+  // Dengan emulator, firebase-admin menerima token tanpa tanda tangan dan menulis file ke emulator;
+  // jangan pernah di produksi.
+  if (env.NODE_ENV === 'production') {
+    for (const key of EMULATOR_HOSTS) {
+      if (env[key]) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: 'Must not be set when NODE_ENV=production',
+        });
+      }
+    }
+  }
+  if (env.STORAGE_ADAPTER === 'firebase' && !env.FIREBASE_STORAGE_BUCKET) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['FIREBASE_STORAGE_BUCKET'],
+      message: 'Required when STORAGE_ADAPTER=firebase',
+    });
+  }
+});
 
 export type Env = z.infer<typeof EnvSchema>;
 

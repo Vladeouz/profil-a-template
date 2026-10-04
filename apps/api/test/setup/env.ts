@@ -10,6 +10,12 @@ const defaults: Record<string, string> = {
   FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
   // pg-boss dijalankan langsung oleh test/int/jobs lewat startBoss(), bukan lewat env.
   RUN_WORKER: 'false',
+  // Unit test memakai adapter palsu. test/int/ports memakai Storage Emulator lokal (docker compose)
+  // lewat createFirebaseFileStorage() dengan bucket dan host di bawah.
+  PUSH_ADAPTER: 'fake',
+  STORAGE_ADAPTER: 'fake',
+  FIREBASE_STORAGE_BUCKET: 'demo-template.appspot.com',
+  FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
 };
 
 for (const [key, value] of Object.entries(defaults)) {
