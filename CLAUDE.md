@@ -4,6 +4,7 @@
 
 - Baca `docs/PRD.md`, `docs/conventions.md` (jika sudah ada), dan log task terakhir di `docs/logs/`.
 - Ambil task berikutnya dari `docs/TASKS.md`: task pertama yang belum dicentang dan semua `depends_on`-nya sudah dicentang.
+- Sebelum mulai, periksa apakah sudah ada branch untuk task itu (`git branch --list "*t-xxx*"`). Jika ada, jangan mengerjakan ulang; laporkan ke user dan tanyakan apakah branch itu perlu digabung dulu.
 
 ## Mengerjakan task
 
