@@ -6,8 +6,8 @@ import { z } from '@hono/zod-openapi';
 export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 100;
 
-// Posisi item terakhir di halaman. `createdAt` berupa string ISO 8601 UTC agar presisi
-// mikrodetik dari PostgreSQL tidak hilang (`Date` hanya milidetik); `Date` juga diterima.
+// Posisi item terakhir di halaman. Semua timestamp di database berpresisi milidetik, jadi repository
+// cukup memberi `Date` dari baris. Decoder tetap menerima 0–6 digit pecahan (string ISO 8601 UTC).
 export type CursorPosition = { createdAt: string; id: string };
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/;

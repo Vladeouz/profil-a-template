@@ -188,26 +188,43 @@ describe('pagination', () => {
     expect(await json(await a.send('GET', '/v1/notes'))).toEqual({ items: [], nextCursor: null });
   });
 
-  it('tidak ada duplikat bila created_at berbeda di bawah milidetik atau sama persis', async () => {
+  it('tidak ada duplikat bila beberapa note jatuh di milidetik yang sama', async () => {
     const a = await login();
-    // Tiga note di milidetik yang sama (beda mikrodetik) dan dua note dengan created_at identik.
-    await getDb().pool.query(
+    // Tiga note dikirim dengan mikrodetik berbeda di milidetik .123 (dibulatkan database menjadi
+    // created_at yang sama), dua note dengan created_at identik, dan satu note lebih baru.
+    const { rows } = await getDb().pool.query<{ id: string; title: string }>(
       `insert into notes (user_id, title, created_at) values
-         ($1, 'u100', '2026-10-01T08:00:00.000100Z'),
-         ($1, 'u200', '2026-10-01T08:00:00.000200Z'),
-         ($1, 'u300', '2026-10-01T08:00:00.000300Z'),
+         ($1, 'ms-a', '2026-10-01T08:00:00.123100Z'),
+         ($1, 'ms-b', '2026-10-01T08:00:00.123200Z'),
+         ($1, 'ms-c', '2026-10-01T08:00:00.123400Z'),
          ($1, 'same-1', '2026-10-01T07:00:00Z'),
-         ($1, 'same-2', '2026-10-01T07:00:00Z')`,
+         ($1, 'same-2', '2026-10-01T07:00:00Z'),
+         ($1, 'newest', '2026-10-01T09:00:00Z')
+       returning id, title`,
       [a.userId],
     );
+    const idDesc = (titles: string[]) =>
+      rows
+        .filter((r) => titles.includes(r.title))
+        .map((r) => r.id)
+        .sort()
+        .reverse();
 
     const pages = await collect(a, 1);
 
-    const titles = pages.flatMap((p) => p.items.map((n) => n.title));
-    expect(titles).toHaveLength(5);
-    expect(titles.slice(0, 3)).toEqual(['u300', 'u200', 'u100']);
-    expect(new Set(titles).size).toBe(5);
+    const items = pages.flatMap((p) => p.items);
+    expect(items).toHaveLength(6);
+    expect(new Set(items.map((n) => n.id)).size).toBe(6);
     expect(pages.at(-1)?.nextCursor).toBeNull();
+    // Milidetik sama → urutan ditentukan id DESC.
+    expect(items.map((n) => n.id)).toEqual([
+      ...idDesc(['newest']),
+      ...idDesc(['ms-a', 'ms-b', 'ms-c']),
+      ...idDesc(['same-1', 'same-2']),
+    ]);
+    expect(items.slice(1, 4).map((n) => n.createdAt)).toEqual(
+      Array(3).fill('2026-10-01T08:00:00.123Z'),
+    );
   });
 });
 

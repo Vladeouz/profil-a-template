@@ -66,6 +66,36 @@ describe('migrasi', () => {
     }
   });
 
+  it('semua kolom timestamp di schema public berpresisi milidetik (timestamptz(3))', async () => {
+    const rows = await query<{ column: string; data_type: string; precision: number }>(
+      `select table_name || '.' || column_name as column, data_type,
+              datetime_precision as precision
+         from information_schema.columns
+        where table_schema = 'public' and data_type like 'timestamp%'
+        order by 1`,
+    );
+
+    expect(rows.map((r) => r.column)).toEqual(
+      expect.arrayContaining(['notes.created_at', 'users.last_seen_at', 'users.updated_at']),
+    );
+    for (const row of rows) {
+      expect(row, row.column).toMatchObject({
+        data_type: 'timestamp with time zone',
+        precision: 3,
+      });
+    }
+  });
+
+  it('nilai di bawah milidetik dibulatkan ke milidetik', async () => {
+    const [row] = await query<{ created_at: Date; micros: string }>(
+      `insert into users (firebase_uid, created_at) values ('uid-1', '2026-10-01T08:00:00.123456Z')
+       returning created_at, to_char(created_at at time zone 'UTC', 'US') as micros`,
+    );
+
+    expect(row?.micros).toBe('123000');
+    expect(row?.created_at.toISOString()).toBe('2026-10-01T08:00:00.123Z');
+  });
+
   it('idempoten: menjalankan migrasi lagi tidak mengubah apa pun', async () => {
     const count = async () =>
       (await query<{ n: number }>(`select count(*)::int as n from drizzle.__drizzle_migrations`))[0]
@@ -116,7 +146,12 @@ describe('users', () => {
 
   it('mengisi id, created_at, dan updated_at; updated_at diperbarui lewat Drizzle', async () => {
     const { db } = getDb();
-    const [created] = await db.insert(users).values({ firebaseUid: 'uid-1' }).returning();
+    // `updated_at` awal di masa lalu: presisi milidetik membuat insert dan update bisa jatuh di
+    // milidetik yang sama.
+    const [created] = await db
+      .insert(users)
+      .values({ firebaseUid: 'uid-1', updatedAt: new Date(Date.now() - 60_000) })
+      .returning();
     expect(created?.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(created?.createdAt).toBeInstanceOf(Date);
 

@@ -17,10 +17,6 @@ function toNote(row: NoteRow): Note {
   };
 }
 
-// `created_at` dengan presisi penuh (mikrodetik) untuk cursor. `Date` hanya milidetik, sehingga
-// cursor dari `Date` bisa membuat note terakhir muncul lagi di halaman berikutnya.
-const cursorCreatedAt = sql<string>`to_char(${notes.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
-
 export function createDrizzleNoteRepository(db: Database): NoteRepository {
   const owned = (userId: string, id: string) => and(eq(notes.id, id), eq(notes.userId, userId));
 
@@ -34,7 +30,7 @@ export function createDrizzleNoteRepository(db: Database): NoteRepository {
     async listByUser(userId, { limit, cursor }) {
       // Ambil `limit + 1` baris; baris tambahan hanya menandakan ada halaman berikutnya.
       const rows = await db
-        .select({ note: notes, cursorCreatedAt })
+        .select()
         .from(notes)
         .where(
           and(
@@ -47,11 +43,9 @@ export function createDrizzleNoteRepository(db: Database): NoteRepository {
         .orderBy(desc(notes.createdAt), desc(notes.id))
         .limit(limit + 1);
 
-      const page = buildPage(rows, limit, (row) => ({
-        createdAt: row.cursorCreatedAt,
-        id: row.note.id,
-      }));
-      return { items: page.items.map((row) => toNote(row.note)), nextCursor: page.nextCursor };
+      // `created_at` berpresisi milidetik (`timestamptz(3)`), jadi `Date` dari baris persis sama
+      // dengan nilai di database dan cukup untuk cursor.
+      return buildPage(rows.map(toNote), limit, (note) => note);
     },
 
     async findById(userId, id) {
