@@ -3,6 +3,7 @@ node_modules/
 dist/
 coverage/
 *.log
+.check-logs/
 
 # Env dan secret
 .env

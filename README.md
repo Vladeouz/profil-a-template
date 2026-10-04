@@ -64,7 +64,7 @@ Perintah dijalankan dari root repo (kecuali disebut lain) dan berlaku di CMD, Po
 
 ## `pnpm check`
 
-Menjalankan berurutan: Biome (`pnpm lint`), typecheck API, unit test API, integration test API, `pnpm contract:check`, `flutter analyze`, dan `flutter test`. Langkah yang gagal tidak menghentikan langkah berikutnya; di akhir tampil ringkasan status dan waktu per langkah, dan exit code bukan 0 bila ada langkah yang gagal. Output langkah yang gagal ada di atas ringkasan.
+Menjalankan berurutan: Biome (`pnpm lint`), typecheck API, unit test API, integration test API, `pnpm contract:check`, `flutter analyze`, dan `flutter test`. Langkah yang gagal tidak menghentikan langkah berikutnya; di akhir tampil ringkasan status dan waktu per langkah, dan exit code bukan 0 bila ada langkah yang gagal. Output langkah yang gagal ada di atas ringkasan dan juga disimpan lengkap ke `.check-logs/<waktu run>/<no>-<langkah>.log` (di-ignore Git; hapus kapan saja), yang jalurnya tampil di kolom Keterangan. Berguna untuk mendiagnosis kegagalan yang tidak selalu terulang.
 
 - Integration test butuh layanan lokal (`docker compose up -d --wait`). Bila Docker mati, langkah itu gagal dengan pesan yang menyebut Docker.
 - Waktu total sekitar 1 menit di laptop pengembang (target di bawah 5 menit), setelah dependency terpasang dan image emulator sudah ada. `contract:check` pertama kali bisa lebih lama karena `dart pub get`.
