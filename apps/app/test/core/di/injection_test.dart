@@ -21,6 +21,8 @@ import 'package:app/features/notes/domain/usecases/delete_note.dart';
 import 'package:app/features/notes/domain/usecases/get_note.dart';
 import 'package:app/features/notes/domain/usecases/list_notes.dart';
 import 'package:app/features/notes/domain/usecases/update_note.dart';
+import 'package:app/features/notes/presentation/cubit/note_form_cubit.dart';
+import 'package:app/features/notes/presentation/cubit/notes_list_cubit.dart';
 
 class MockFirebaseAuth extends Mock implements FirebaseAuth {}
 
@@ -83,6 +85,14 @@ void main() {
     expect(container<CreateNote>(), isA<CreateNote>());
     expect(container<UpdateNote>(), isA<UpdateNote>());
     expect(container<DeleteNote>(), isA<DeleteNote>());
+  });
+
+  test('Cubit notes dibuat baru setiap halaman dibuka (factory)', () {
+    expect(
+      container<NotesListCubit>(),
+      isNot(same(container<NotesListCubit>())),
+    );
+    expect(container<NoteFormCubit>(), isNot(same(container<NoteFormCubit>())));
   });
 
   test('memakai GetIt.instance bila container tidak diberikan', () async {

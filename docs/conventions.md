@@ -323,10 +323,14 @@ features/notes/
 │   ├── entities/                     # note.dart, note_page.dart
 │   ├── repositories/                 # note_repository.dart
 │   └── usecases/                     # list_notes, get_note, create_note, update_note, delete_note
-└── data/
-    ├── note_remote_data_source.dart  # membungkus NotesClient, mengembalikan DTO, melempar DioException
-    ├── note_mapper.dart              # DTO → entity (noteFromDto, notePageFromDto)
-    └── api_note_repository.dart      # apiCall(() => _remote.xxx(), map: ...) → Result
+├── data/
+│   ├── note_remote_data_source.dart  # membungkus NotesClient, mengembalikan DTO, melempar DioException
+│   ├── note_mapper.dart              # DTO → entity (noteFromDto, notePageFromDto)
+│   └── api_note_repository.dart      # apiCall(() => _remote.xxx(), map: ...) → Result
+└── presentation/
+    ├── cubit/                        # notes_list_cubit (daftar + pagination), note_form_cubit (buat/ubah/hapus)
+    ├── pages/                        # notes_page.dart (/notes), note_form_page.dart (/notes/new, /notes/:id)
+    └── widgets/                      # note_tile, note_form, load_more_footer, failure_view
 ```
 
 - Data source satu kelas per resource di atas client hasil generate (`c<ApiClient>().notes`): menerima parameter Dart biasa, membuat DTO input (`CreateNoteInput`, `UpdateNoteInput`), dan mengembalikan DTO respons. Tidak menangkap exception.
@@ -336,6 +340,16 @@ features/notes/
 - Parameter opsional `null` berarti "tidak dikirim": `limit` `null` = bawaan API (20), `body` `null` saat membuat = tidak dikirim (API menyimpan `''`), field `null` saat mengubah = tidak diubah.
 - Use case hanya menormalisasi input (`title.trim()`) lalu meneruskan ke repository; wajib diisi, batas panjang, dan minimal satu field ditegakkan API (lihat Aturan bisnis: API vs client).
 
+Presentation (`features/notes/presentation/`):
+
+- **Daftar dengan pagination** (`NotesListCubit`): state sealed `Loading` / `LoadFailed(failure)` / `Loaded(items, nextCursor, loadingMore, loadMoreFailure)`. `load()` memuat halaman pertama (juga untuk "Coba lagi"); `loadMore()` memakai `nextCursor` dan diabaikan bila sudah halaman terakhir atau sedang memuat. Gagal di halaman berikutnya tidak menghapus daftar: `loadMoreFailure` tampil di baris terakhir dengan tombol "Coba lagi", tanpa coba ulang otomatis. Setelah `await`, Cubit membaca `state` lagi karena daftar bisa berubah selama menunggu.
+- **Muat saat digulir:** baris terakhir `ListView.builder` (`LoadMoreFooter`) memanggil `loadMore()` setelah frame pertama ia dibangun. `ListView.builder` baru membangunnya saat digulir mendekati bawah, jadi tidak perlu `ScrollController`, dan halaman pertama yang tidak memenuhi layar langsung memuat halaman berikutnya. Jangan memanggil Cubit langsung di `build`.
+- **Gagal memuat halaman** (jaringan, `NOT_FOUND`): `FailureView` menampilkan `failureMessage(code)` dan tombol "Coba lagi".
+- **Form** (`NoteFormCubit`): state sealed `Loading` / `LoadFailed` / `Editing(note?, status, failure)` / `Saved(note)` / `Deleted(id)`; `note` `null` = membuat baru. Error validasi API (`failure.fieldErrors['title']`) tampil sebagai `errorText` di field-nya lewat `fieldIssueMessage`; kegagalan yang tidak punya field (jaringan, `NOT_FOUND`, `_root`) tampil di atas tombol simpan. Validasi lokal hanya "wajib diisi" dan `maxLength` sama dengan API. Hapus selalu lewat dialog konfirmasi.
+- **Navigasi form ↔ daftar:** daftar membuka form dengan `context.push<NoteFormState>(AppRoutes.note(id), extra: note)`; form menutup dirinya dengan `context.pop(NoteFormSaved/NoteFormDeleted)`, lalu daftar menerapkan hasilnya (`noteSaved`, `noteDeleted`) tanpa memuat ulang dari API. Rute ubah membaca note dari `extra`; bila kosong (URL dibuka langsung atau dimuat ulang di web), router memanggil `cubit.load(id)` sehingga note diambil lewat `GetNote`.
+- **Rute anak:** halaman form adalah rute anak (`new`, `:id`) dari rute daftar di dalam `ShellRoute` terlindungi, sehingga membuka URL form langsung tetap menaruh daftar di bawahnya. `new` didaftarkan sebelum `:id`. `GoRouter.optionURLReflectsImperativeAPIs = true` (di `createRouter`) agar `push` ikut mengubah URL di web.
+- **Waktu:** `updatedAt.toLocal()` diformat dengan `MaterialLocalizations.formatMediumDate` (locale `id`), tanpa package `intl`.
+
 ### Test Flutter
 
 - Test di `apps/app/test/` mengikuti struktur `lib/` (`lib/core/network/auth_interceptor.dart` → `test/core/network/auth_interceptor_test.dart`). Helper test yang bukan test tanpa akhiran `_test.dart` (contoh: `test/core/network/fake_http_adapter.dart`).
@@ -343,9 +357,7 @@ features/notes/
 - Use case: satu file test per use case, repository di-mock (`test/features/auth/domain/usecases/sign_in_test.dart`). Cubit: `blocTest` (`test/features/auth/presentation/cubit/login_cubit_test.dart`). Halaman: widget test dengan Cubit mock + `whenListen` (`test/features/auth/presentation/pages/login_page_test.dart`).
 - Router: widget test dengan wiring fitur asli (`registerAuthDependencies` pada `GetIt.asNewInstance()`) dan repository diganti fake dalam memori (`test/features/auth/fake_auth_repository.dart`), lalu `App(router: createRouter(container: c))` (`test/core/router/app_router_test.dart`).
 - HTTP diuji lewat Dio sungguhan dengan `FakeHttpAdapter` (mencatat request, menjawab per request), bukan mock Dio. Contoh: `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`.
-- Fitur berbasis API: use case dengan repository di-mock (`test/features/notes/domain/usecases/*_test.dart`); repository impl dengan data source di-mock yang melempar `DioException.badResponse` berisi body error standar (`test/features/notes/data/api_note_repository_test.dart`); data source dengan `NotesClient` asli + `FakeHttpAdapter` untuk memeriksa method, path, query, dan body request (`test/features/notes/data/note_remote_data_source_test.dart`). Fixture entity dan JSON (`testNote`, `noteJson`) di `test/features/notes/mocks.dart`.
+- Fitur berbasis API: use case dengan repository di-mock (`test/features/notes/domain/usecases/*_test.dart`); repository impl dengan data source di-mock yang melempar `DioException.badResponse` berisi body error standar (`test/features/notes/data/api_note_repository_test.dart`); data source dengan `NotesClient` asli + `FakeHttpAdapter` untuk memeriksa method, path, query, dan body request (`test/features/notes/data/note_remote_data_source_test.dart`). Fixture entity dan JSON (`testNote`, `noteJson`, `noteNo(i)`) di `test/features/notes/mocks.dart`.
+- Presentation fitur berbasis API: Cubit dengan use case di-mock (`test/features/notes/presentation/cubit/*_test.dart`); halaman dengan Cubit mock (`pages/*_test.dart`). Halaman yang menutup dirinya dengan `context.pop(hasil)` dipasang di atas `GoRouter` kecil di dalam test agar hasilnya bisa diperiksa (`note_form_page_test.dart`). Error di field diperiksa lewat `TextField.decoration.errorText` field itu, bukan sekadar teks ada di layar. Halaman dengan indikator berputar tidak memakai `pumpAndSettle` (tidak pernah selesai).
+- Alur fitur lengkap lewat router, Cubit, dan use case asli dengan repository palsu yang meniru API (`test/features/notes/fake_note_repository.dart`, `test/features/notes/presentation/notes_flow_test.dart`). Test router yang membuka beranda juga mendaftarkan fitur notes dengan repository palsu itu.
 - Test `config/dev.json` membaca file aslinya, jadi kunci yang hilang terdeteksi (`test/core/config/app_config_test.dart`).
-
-## Belum diisi
-
-- Flutter: presentation fitur notes (T-016)

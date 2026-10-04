@@ -10,7 +10,11 @@ import 'package:app/features/auth/presentation/cubit/login_cubit.dart';
 import 'package:app/features/auth/presentation/cubit/register_cubit.dart';
 import 'package:app/features/auth/presentation/pages/login_page.dart';
 import 'package:app/features/auth/presentation/pages/register_page.dart';
-import 'package:app/features/auth/presentation/widgets/sign_out_button.dart';
+import 'package:app/features/notes/domain/entities/note.dart';
+import 'package:app/features/notes/presentation/cubit/note_form_cubit.dart';
+import 'package:app/features/notes/presentation/cubit/notes_list_cubit.dart';
+import 'package:app/features/notes/presentation/pages/note_form_page.dart';
+import 'package:app/features/notes/presentation/pages/notes_page.dart';
 
 /// Path rute app. Fitur menambah path di sini dan rutenya di [createRouter].
 abstract final class AppRoutes {
@@ -18,6 +22,8 @@ abstract final class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const notes = '/notes';
+  static const noteNew = '/notes/new';
+  static String note(String id) => '/notes/$id';
 
   /// Rute yang boleh dibuka tanpa login. Rute lain dilindungi.
   static const public = {login, register};
@@ -36,6 +42,9 @@ GoRouter createRouter({
 }) {
   final c = container ?? getIt;
   final session = c<AuthSessionCubit>();
+  // `context.push` ikut mengubah URL (web): tombol kembali browser menutup halaman yang
+  // di-push, dan muat ulang membuka halaman yang sama (misalnya `/notes/<id>`).
+  GoRouter.optionURLReflectsImperativeAPIs = true;
 
   return GoRouter(
     initialLocation: initialLocation,
@@ -63,7 +72,40 @@ GoRouter createRouter({
         routes: [
           GoRoute(
             path: AppRoutes.notes,
-            builder: (context, state) => const _NotesPlaceholderPage(),
+            builder: (context, state) => BlocProvider(
+              create: (_) => c<NotesListCubit>()..load(),
+              child: const NotesPage(),
+            ),
+            routes: [
+              GoRoute(
+                path: 'new',
+                builder: (context, state) => BlocProvider(
+                  create: (_) => c<NoteFormCubit>(),
+                  child: const NoteFormPage(),
+                ),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  // `extra` berisi note dari daftar; kosong bila dibuka lewat URL
+                  // (misalnya muat ulang di web), maka note dimuat dari API.
+                  final note = state.extra;
+                  return BlocProvider(
+                    create: (_) {
+                      final cubit = c<NoteFormCubit>();
+                      if (note is Note) {
+                        cubit.edit(note);
+                      } else {
+                        cubit.load(id);
+                      }
+                      return cubit;
+                    },
+                    child: NoteFormPage(noteId: id),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -86,22 +128,6 @@ String? _authRedirect(AuthSessionState session, GoRouterState state) {
 class _StreamListenable extends ChangeNotifier {
   _StreamListenable(Stream<Object?> stream) {
     stream.listen((_) => notifyListeners());
-  }
-}
-
-/// Sementara sampai halaman notes ada (T-016). Halaman pengganti tetap memasang `SignOutButton`.
-class _NotesPlaceholderPage extends StatelessWidget {
-  const _NotesPlaceholderPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Catatan'),
-        actions: const [SignOutButton()],
-      ),
-      body: const Center(child: Text('Belum ada catatan.')),
-    );
   }
 }
 

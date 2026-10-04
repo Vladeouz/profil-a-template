@@ -9,8 +9,11 @@ import 'package:app/features/auth/auth_dependencies.dart';
 import 'package:app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:app/features/auth/presentation/pages/login_page.dart';
 import 'package:app/features/auth/presentation/pages/register_page.dart';
+import 'package:app/features/notes/domain/repositories/note_repository.dart';
+import 'package:app/features/notes/notes_dependencies.dart';
 
 import '../../features/auth/fake_auth_repository.dart';
+import '../../features/notes/fake_note_repository.dart';
 
 void main() {
   const email = 'a@example.com';
@@ -18,10 +21,12 @@ void main() {
 
   late GetIt container;
 
-  /// Wiring fitur auth yang asli, dengan [FakeAuthRepository] menggantikan Firebase.
+  /// Wiring fitur auth dan notes yang asli, dengan [FakeAuthRepository] menggantikan
+  /// Firebase dan [FakeNoteRepository] menggantikan API.
   void setUpAuth({bool signedIn = false}) {
     container = GetIt.asNewInstance();
     registerAuthDependencies(container);
+    registerNotesDependencies(container);
     container
       ..unregister<AuthRepository>()
       ..registerSingleton<AuthRepository>(
@@ -29,7 +34,9 @@ void main() {
           accounts: {email: password},
           signedIn: signedIn ? FakeAuthRepository.userFor(email) : null,
         ),
-      );
+      )
+      ..unregister<NoteRepository>()
+      ..registerSingleton<NoteRepository>(FakeNoteRepository());
     addTearDown(container.reset);
   }
 
