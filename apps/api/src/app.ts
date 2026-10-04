@@ -9,6 +9,13 @@ import { createErrorHandler, notFoundHandler, validationHook } from './core/http
 import { requestLogger } from './core/logger.js';
 import type { Ports } from './core/ports/create-ports.js';
 import type { Database } from './db/client.js';
+import { registerNoteRoutes } from './features/notes/http/notes.route.js';
+import { createDrizzleNoteRepository } from './features/notes/infrastructure/drizzle-note-repository.js';
+import { createNote } from './features/notes/usecases/create-note.js';
+import { deleteNote } from './features/notes/usecases/delete-note.js';
+import { getNote } from './features/notes/usecases/get-note.js';
+import { listNotes } from './features/notes/usecases/list-notes.js';
+import { updateNote } from './features/notes/usecases/update-note.js';
 import { registerHealthRoutes } from './features/system/http/health.route.js';
 import { registerUserRoutes } from './features/users/http/me.route.js';
 import { createDrizzleUserRepository } from './features/users/infrastructure/drizzle-user-repository.js';
@@ -45,6 +52,16 @@ export function createApp({
   app.use('/v1/*', authenticate({ verifier: tokenVerifier, resolveUser: syncUser({ users }) }));
   registerBearerAuth(app);
   registerUserRoutes(app);
+
+  // CONTOH fitur: repository → use case → route. Fitur baru dirakit dengan pola yang sama.
+  const notes = createDrizzleNoteRepository(db);
+  registerNoteRoutes(app, {
+    listNotes: listNotes({ notes }),
+    createNote: createNote({ notes }),
+    getNote: getNote({ notes }),
+    updateNote: updateNote({ notes }),
+    deleteNote: deleteNote({ notes }),
+  });
 
   return app;
 }

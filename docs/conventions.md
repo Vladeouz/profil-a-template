@@ -131,13 +131,14 @@ D-06: layanan luar yang tidak punya emulator atau aturannya berbeda per proyek d
 
 ## Pagination
 
-Helper di `apps/api/src/core/http/pagination.ts`, contoh pemakaian di `apps/api/test/unit/core/http/pagination.test.ts` (route di T-011: `features/notes`).
+Helper di `apps/api/src/core/http/pagination.ts`. Contoh route: `listNotesRoute` di `apps/api/src/features/notes/http/notes.route.ts`; contoh repository: `listByUser` di `features/notes/infrastructure/drizzle-note-repository.ts`.
 
 - Query `?limit=20&cursor=<opaque>`: pakai `PaginationQuerySchema` sebagai `request.query`, atau `PaginationQuerySchema.extend({ ... })` bila route punya filter. `limit` 1–100, default 20. Handler menerima `cursor` yang sudah di-decode (`{ createdAt, id }` atau `undefined`).
 - Cursor rusak → `422 VALIDATION_ERROR` dengan `details.cursor` (`custom`, `Invalid cursor`). Hanya bentuk kanonis hasil `encodeCursor` yang diterima.
 - Respons `{ items, nextCursor }` dengan skema `pageSchema(ItemSchema, '<Item>Page')`; nama kedua menjadi nama komponen OpenAPI dan kelas Dart. `nextCursor` `null` di halaman terakhir.
 - Cursor adalah base64url dari `createdAt|id`, urutan `created_at DESC, id DESC`. Repository mengambil `limit + 1` baris dengan kondisi `(created_at, id) < (cursor.createdAt, cursor.id)`, lalu `buildPage(rows, limit, positionOf)` membuang baris tambahan dan membentuk `nextCursor`.
-- **Presisi timestamp.** PostgreSQL menyimpan `created_at` sampai mikrodetik, sedangkan `Date` hanya milidetik. Cursor yang dibuat dari `Date` bisa membuat baris terakhir muncul lagi di halaman berikutnya. `createdAt` di cursor berupa string ISO 8601 UTC dengan 0–6 digit pecahan, jadi repository memberi `positionOf` nilai `created_at` dengan presisi penuh dari database (atau memakai kolom berpresisi milidetik); diputuskan di T-011.
+- **Presisi timestamp.** PostgreSQL menyimpan `created_at` sampai mikrodetik, sedangkan `Date` hanya milidetik. Cursor yang dibuat dari `Date` bisa membuat baris terakhir muncul lagi di halaman berikutnya. `createdAt` di cursor berupa string ISO 8601 UTC dengan 0–6 digit pecahan, jadi repository memberi `positionOf` nilai `created_at` dengan presisi penuh dari database: kolom tambahan `to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` di `select`, dan perbandingan `(created_at, id) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`. Kolom tetap mikrodetik; respons API tetap milidetik (`toISOString()`). Diputuskan di T-011, dijaga test `test/int/notes/notes.int.test.ts` › tidak ada duplikat bila created_at berbeda di bawah milidetik.
+- Index pagination per pemilik: `index(...).on(table.userId, table.createdAt.desc().nullsFirst(), table.id.desc().nullsFirst())`. `nullsFirst()` wajib: tanpa itu Drizzle menulis `DESC NULLS LAST`, yang tidak cocok dengan `ORDER BY ... DESC`, sehingga PostgreSQL tetap melakukan `Sort` (dicek dengan `EXPLAIN` di `test/int/notes/notes-schema.int.test.ts`).
 - Jangan menambah `.openapi()` pada `limit`: override itu menghapus `minimum`, `maximum`, dan `default` dari OpenAPI (dijaga test).
 
 ## Database
@@ -145,7 +146,8 @@ Helper di `apps/api/src/core/http/pagination.ts`, contoh pemakaian di `apps/api/
 - Drizzle ORM + `pg` (node-postgres). Skema di `apps/api/src/db/schema/`, satu file per tabel, diekspor ulang dari `schema/index.ts`. Contoh: `apps/api/src/db/schema/users.ts`.
 - Tabel snake_case jamak; properti TypeScript camelCase dengan nama kolom ditulis eksplisit (`firebaseUid: text('firebase_uid')`).
 - Kolom bersama dari `schema/columns.ts`: `id()` (`uuid` default `gen_random_uuid()`), `createdAt()`, `updatedAt()` (`$onUpdate`, hanya berlaku lewat `db.update()` Drizzle), `timestamptz(nama)` untuk timestamp lain. Semua timestamp `timestamptz` dengan `mode: 'date'`; kolom `date` memakai `mode: 'string'`.
-- Constraint diberi nama eksplisit `<tabel>_<kolom>_<jenis>` (`users_firebase_uid_unique`, `users_email_lowercase_check`) agar test dan penanganan error bisa merujuknya. Enum ditulis sebagai `text` + `check`.
+- Constraint dan index diberi nama eksplisit `<tabel>_<kolom>_<jenis>` (`users_firebase_uid_unique`, `users_email_lowercase_check`, `notes_title_length_check`, `notes_user_id_fk`, `notes_user_id_created_at_id_index`) agar test dan penanganan error bisa merujuknya. Foreign key ditulis dengan `foreignKey({ name, columns, foreignColumns })`, bukan `.references()`, karena nama bawaan Drizzle tidak mengikuti pola ini. Enum ditulis sebagai `text` + `check`. Contoh: `apps/api/src/db/schema/notes.ts`.
+- Data milik user memakai `user_id` FK ke `users.id` `ON DELETE CASCADE`. Batas panjang teks ditegakkan dengan CHECK `char_length(...)` selain skema Zod route; batas Zod sama atau lebih ketat (Zod menghitung UTF-16 code unit, `char_length` menghitung karakter), jadi input yang lolos Zod tidak pernah melanggar CHECK.
 - Migrasi: ubah skema → `pnpm --filter api db:generate --name <ringkas>` → commit file `apps/api/drizzle/NNNN_<ringkas>.sql` beserta `meta/`. Migrasi yang sudah di-commit tidak diedit. `db:generate` tanpa perubahan skema harus mencetak `No schema changes`.
 - `pnpm --filter api db:migrate` (`src/db/migrate.ts`) menerapkan migrasi ke `DATABASE_URL`; idempoten. Hanya butuh `DATABASE_URL` (`loadDatabaseUrl()`), bukan seluruh env server.
 - Koneksi dibuat lewat `createDb(url)` dari `src/db/client.ts` (mengembalikan `{ db, pool, close }`).
@@ -173,10 +175,31 @@ Bentuk dan daftar `ErrorCode` mengikuti PRD bagian 5. Implementasi di `apps/api/
 - Token login dibuat lewat Auth Emulator dengan `signUp()` / `updateAccount()` dari `test/helpers/emulator-token.ts` (email acak, emulator tidak dibersihkan). Token kedaluwarsa atau untuk project lain dibuat dengan `unsignedIdToken({ exp, aud, … })`. Contoh: `test/int/users/me.int.test.ts`.
 - Test HTTP memanggil `app.request()` pada `createTestApp()`, bukan server sungguhan. Route khusus test didaftarkan di app hasil `createTestApp()` di dalam file test-nya (contoh: `test/unit/core/http/errors.test.ts`).
 - Log diperiksa dengan `createLogger({ level: 'info' }, stream)` memakai `Writable` yang menampung baris JSON (contoh: `test/unit/core/logger.test.ts`).
+- Setiap use case punya unit test dengan repository palsu di memori yang meniru perilaku implementasi Drizzle (pembatasan pemilik, urutan, cursor). Repository palsu fitur ditaruh di `test/unit/features/<fitur>/fake-<nama>-repository.ts` (bukan `*.test.ts`, jadi tidak dijalankan sendiri). Contoh: `test/unit/features/notes/fake-note-repository.ts`, `test/unit/features/notes/usecases/*.test.ts`.
+- Unit test route memeriksa pemetaan DTO dan dokumen OpenAPI (operationId, security, status, nama skema); perilaku route yang butuh login diuji di integration test. Contoh: `test/unit/features/notes/http/notes.route.test.ts`, `test/int/notes/notes.int.test.ts`.
+- Keadaan awal integration test dibuat dengan `insertUser`, `insertNote`, `insertNotes` dari `test/helpers/factories.ts`; data yang diuji lewat HTTP tetap dibuat lewat route. Integration test yang butuh `userId` login memanggil `GET /v1/me` dulu (helper `login()` di `test/int/notes/notes.int.test.ts`).
+
+## Clean Architecture API
+
+Contoh lengkap: `apps/api/src/features/notes/` (fitur CONTOH yang ditiru lalu dihapus di proyek).
+
+```
+features/<fitur>/
+├── domain/<entity>.ts                         # entity, input, interface repository; tanpa import Hono/Drizzle
+├── usecases/<aksi>-<entity>.ts                # satu use case per file
+├── infrastructure/drizzle-<entity>-repository.ts
+└── http/<fitur>.route.ts                      # skema Zod, createRoute, DTO, registerXxxRoutes
+```
+
+- Arah dependency: `http` → `usecases` → `domain` ← `infrastructure`. Use case hanya mengimpor `domain`, `AppError` (`core/http/errors.ts`), port (`core/ports`), dan tipe `Page`/`CursorPosition` (`core/http/pagination.ts`); tidak pernah Hono, Drizzle, atau firebase-admin.
+- Use case adalah fungsi pabrik `xxxNote({ notes })` yang mengembalikan fungsi, dengan tipe `export type XxxNote = ReturnType<typeof xxxNote>`. Dependency (repository, port, `now`) masuk lewat objek pertama agar test bisa memberi versi palsu. Contoh: `features/notes/usecases/get-note.ts`.
+- Entity domain memakai `Date` untuk timestamp. Konversi ke JSON (`toISOString()`, membuang field internal seperti `userId`) hanya di `http` lewat fungsi `toXxxDto`.
+- Repository dibatasi pemilik: setiap metode menerima `userId` dan memfilter `user_id` di query yang sama (bukan ambil dulu lalu cek), lalu mengembalikan `null`/`false` bila tidak ada atau milik user lain. Use case mengubahnya menjadi `AppError('NOT_FOUND', ...)` (D-07: `404`, bukan `403`).
+- `createApp()` di `src/app.ts` adalah composition root: buat repository dari `db`, rakit use case, lalu `registerXxxRoutes(app, { ...useCases })`. Route menerima use case lewat parameter, bukan membuatnya sendiri.
+- Route: path param `id` divalidasi `z.uuid()` (bukan UUID → `422 details.id`); body POST/PATCH memakai `request.body.required: true`; PATCH memakai skema dengan semua field opsional + `.refine()` minimal satu field (→ `details._root`); `DELETE` mengembalikan `c.body(null, 204)`. Skema request dan respons diberi nama `.openapi('Note')`, `'CreateNoteInput'`, `'UpdateNoteInput'`, `'NotePage'`.
 
 ## Belum diisi
 
-- Clean Architecture API: T-011
 - Kontrak dan client Dart: T-012
 - Flutter: T-013 sampai T-016
 - Test: T-013 (Flutter)

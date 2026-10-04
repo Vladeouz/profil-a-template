@@ -56,7 +56,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/api/src/core/ports/{push-sender,file-storage}.ts`, `apps/api/src/core/ports/adapters/{fake-push,fcm-push,fake-storage,firebase-storage}.ts`, `apps/api/test/unit/core/ports/**`, `apps/api/test/int/ports/firebase-storage.int.test.ts`
   - done when: unit test untuk adapter palsu dan adapter FCM (firebase-admin di-mock) lulus; integration test menyimpan, membaca, dan menghapus file lewat Storage Emulator lulus; pemilihan adapter lewat env (`PUSH_ADAPTER`, `STORAGE_ADAPTER`) teruji
 
-- [ ] T-011 Fitur contoh notes (API)
+- [x] T-011 Fitur contoh notes (API)
   - layer: api · depends_on: T-007, T-008 · refs: FR-09, D-07, NFR-05, NFR-06
   - files: `apps/api/src/db/schema/notes.ts`, `apps/api/drizzle/0001_*.sql`, `apps/api/src/features/notes/{domain,usecases,infrastructure,http}/**`, `apps/api/test/unit/features/notes/**`, `apps/api/test/int/notes/**`, `apps/api/test/helpers/factories.ts`
   - done when: `pnpm --filter api test` dan `pnpm --filter api test:int` lulus untuk setiap kriteria FR-09, termasuk isolasi antar-user (`404`), pagination 25 notes tanpa duplikat, dan CHECK constraint `title`/`body` di level database; setiap use case punya unit test dengan repository palsu
