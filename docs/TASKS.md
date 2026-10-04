@@ -70,7 +70,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
 
 ## Fase 3 — Flutter
 
-- [ ] T-013 Kerangka Flutter: config, DI, router, `Result`, network, pemetaan error
+- [x] T-013 Kerangka Flutter: config, DI, router, `Result`, network, pemetaan error
   - layer: app · depends_on: T-004, T-012 · refs: FR-11, D-03, D-04
   - files: `apps/app/pubspec.yaml`, `apps/app/analysis_options.yaml`, `apps/app/config/dev.json`, `apps/app/lib/{main,app}.dart`, `apps/app/lib/core/{config,di,error,network,router,theme,l10n}/**`, `apps/app/test/core/**`
   - done when: `flutter analyze` bersih dan `flutter test` lulus dengan test untuk setiap kriteria FR-11, termasuk penggantian host `10.0.2.2` di Android, pemetaan setiap `ErrorCode` ke teks Bahasa Indonesia, dan interceptor yang me-refresh token sekali saat `401`

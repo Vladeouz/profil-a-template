@@ -37,8 +37,15 @@ Library dipin ke versi pasti (tanpa `^` atau `~`) saat pertama dipasang, lalu di
 | `dio` (Dart) | 5.11.1 | T-012 |
 | `retrofit` (Dart) | 4.10.0 | T-012 |
 | `json_annotation` (Dart) | 4.12.0 | T-012 |
+| `firebase_core` (Flutter) | 4.15.0 | T-004 (spike), T-013 |
+| `firebase_auth` (Flutter) | 6.7.0 | T-004 (spike), T-013 |
+| `get_it` (Flutter) | 9.3.0 | T-013 |
+| `go_router` (Flutter) | 18.0.2 | T-013 |
+| `equatable` (Flutter) | 3.0.0 | T-013 |
+| `flutter_lints` (Flutter, dev) | 6.0.0 | T-004 (spike), T-013 |
+| `mocktail` (Flutter, dev) | 1.0.5 | T-013 |
 
-Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`. Build script yang tidak dibutuhkan didaftarkan dengan nilai `false` beserta alasannya di komentar (saat ini `@firebase/util` dan `protobufjs`, dependency `firebase-admin`); jangan biarkan nilai placeholder `set this to true or false` yang ditulis pnpm.
+Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket Dart/Flutter: `flutter pub add <nama>:<versi>` (atau `flutter pub add <nama>` lalu hapus `^` di `pubspec.yaml`); `dio` di app sama persis dengan `packages/contract/dart`. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`. Build script yang tidak dibutuhkan didaftarkan dengan nilai `false` beserta alasannya di komentar (saat ini `@firebase/util` dan `protobufjs`, dependency `firebase-admin`); jangan biarkan nilai placeholder `set this to true or false` yang ditulis pnpm.
 
 pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila `pnpm add` menambah `minimumReleaseAgeExclude` ke `pnpm-workspace.yaml`, batalkan perubahan itu (`pnpm-workspace.yaml`, `pnpm-lock.yaml`, `package.json`) dan pin versi sebelumnya; jangan melonggarkan policy.
 
@@ -66,9 +73,9 @@ pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila 
 
 ## Lingkungan Flutter dan Android
 
-Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan); ditemukan di T-004.
+Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan); ditemukan di T-004, dipakai untuk `apps/app` sejak T-013.
 
-- **Pub cache satu drive dengan repo (Windows).** Bila repo dan pub cache beda drive (misalnya repo di `D:` dan pub cache bawaan di `%LOCALAPPDATA%\Pub\Cache`), build Android gagal saat kompilasi Kotlin plugin: `Could not close incremental caches … this and base files have different roots`. Atasi di mesin, bukan di proyek: `setx PUB_CACHE D:\pub-cache`, buka terminal baru, lalu `flutter pub get` ulang. Jangan menambah `kotlin.incremental=false` ke `apps/app`.
+- **Pub cache satu drive dengan repo (Windows).** Bila repo dan pub cache beda drive (misalnya repo di `D:` dan pub cache bawaan di `%LOCALAPPDATA%\Pub\Cache`), build Android gagal saat kompilasi Kotlin plugin: `Could not close incremental caches … this and base files have different roots`. Atasi di mesin, bukan di proyek: `setx PUB_CACHE D:\pub-cache`, buka terminal baru, lalu `flutter pub get` ulang. `prereq` memperingatkan bila drive repo berbeda dengan drive `PUB_CACHE` (atau lokasi bawaannya) dan menyarankan nilai `setx` yang tepat. Jangan menambah `kotlin.incremental=false` ke `apps/app/android/gradle.properties`; pengaturan itu hanya ada di spike T-004.
 - **NDK dan SDK Platform Android dipasang sebelum build pertama.** Gradle bisa macet bila memasangnya sendiri. Yang dibutuhkan: NDK dan `compileSdk` bawaan Flutter (dibaca `prereq` dari `FlutterExtension.kt` di Flutter SDK; Flutter 3.47.5: NDK `28.2.13676358`, platform 36) serta platform 34 untuk plugin `firebase_core` dan `firebase_auth`. Pasang dengan `%LOCALAPPDATA%\Android\Sdk\cmdline-tools\latest\bin\android.exe sdk install ndk/<versi> platforms/android-<level>` (cmdline-tools lama: `sdkmanager "ndk;<versi>"`). `prereq` menganggap paket terpasang hanya bila isinya lengkap (`source.properties` untuk NDK, `android.jar` untuk platform), jadi folder setengah jadi ikut dilaporkan.
 
 ## API
@@ -220,7 +227,63 @@ D-01, D-02: route Hono adalah satu-satunya sumber kebenaran. `packages/contract/
 - `ErrorCode` menjadi enum Dart dengan nilai `$unknown` untuk kode yang belum dikenal (`unknown_enum_value: true`); Flutter memetakan `$unknown` ke teks umum. Respons error sampai di dio sebagai `DioException` dengan `response.data` berupa `Map`, dibaca dengan `ErrorBody.fromJson`.
 - Waktu: `build_runner` pertama ~35–45 detik (kompilasi builder; juga berlaku untuk `contract:check` bila `dart/.dart_tool` belum ada, misalnya di CI). Setelah itu `contract:check` ~6 detik karena `.dart_tool` ikut disalin ke folder sementara.
 
+## Flutter
+
+Aplikasi di `apps/app` (package `app`, platform web, Android, iOS), dibuat dengan `flutter create --empty`. Lint `flutter_lints` + `strict-casts`, `strict-inference`, `strict-raw-types`, `always_use_package_imports`, `prefer_single_quotes` (`analysis_options.yaml`); format dengan `dart format` (lebar bawaan 80). `flutter analyze` dan `flutter test` dijalankan di `apps/app`.
+
+```
+lib/
+├── main.dart                 # config → Firebase → useAuthEmulator → configureDependencies → runApp
+├── app.dart                  # MaterialApp.router: tema, locale id, router
+└── core/
+    ├── config/app_config.dart
+    ├── di/injection.dart
+    ├── error/                # failure.dart, result.dart
+    ├── l10n/                 # app_locale.dart, failure_messages.dart
+    ├── network/              # create_dio.dart, auth_interceptor.dart, token_provider.dart, error_mapper.dart, api_call.dart
+    ├── router/app_router.dart
+    └── theme/app_theme.dart
+```
+
+### Config
+
+- D-04: nilai dibaca dari `--dart-define-from-file=config/dev.json` (`flutter run -d chrome --web-port 8081 --dart-define-from-file=config/dev.json`). Kunci: `API_BASE_URL`, `FIREBASE_PROJECT_ID` (`demo-template`), `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID` (dummy, satu nilai untuk semua platform), `USE_EMULATOR`, `AUTH_EMULATOR_HOST`, `AUTH_EMULATOR_PORT`. Tanpa `flutterfire configure` dan `google-services.json`.
+- `AppConfig.fromEnvironment()` (`core/config/app_config.dart`) membaca `String.fromEnvironment`, lalu `AppConfig.fromMap()` memvalidasi. Nilai kosong atau salah → `ConfigException` yang menyebut nama kunci. Kunci baru ditambahkan bersamaan ke `config/dev.json`, `fromEnvironment`, `fromMap`, dan test-nya.
+- Di Android (bukan web), host `localhost`/`127.0.0.1` di `API_BASE_URL` dan `AUTH_EMULATOR_HOST` diganti `10.0.2.2` oleh kode (`resolveHost`), bukan config terpisah per platform.
+- Build debug Android mengizinkan HTTP (`android:usesCleartextTraffic="true"` hanya di `android/app/src/debug/AndroidManifest.xml`) karena API lokal dan Auth Emulator memakai HTTP.
+- `useAuthEmulator` dipanggil di `main.dart` setelah `Firebase.initializeApp` dan sebelum operasi Auth apa pun. Peringatan Android `FirebaseApp failed to initialize because no default options were found` wajar.
+
+### Result dan Failure
+
+- Repository dan use case mengembalikan `Result<T>` (`core/error/result.dart`): sealed `Ok(value)` / `Err(failure)`, dibaca dengan `switch`. Exception tidak dilempar melewati batas repository.
+- `Failure` (`core/error/failure.dart`) adalah kelas Dart murni (tanpa dio atau DTO) berisi `FailureCode`, `message` (Inggris, untuk log), dan `fieldErrors` (`Map<String, List<FieldIssue>>`, dari `details` 422 dengan kunci path yang sama: `title`, `items.0.name`, `_root`).
+- `FailureCode` = setiap `ErrorCode` kontrak + `network` (gagal koneksi/timeout) + `unknown` (kode belum dikenal atau body tidak terbaca).
+
+### Network
+
+- Dio dibuat `createDio()` (`core/network/create_dio.dart`) dengan `baseUrl` dari config dan `AuthInterceptor`; `ApiClient` dari `api_client` memakai Dio itu.
+- `AuthInterceptor` menambahkan `Authorization: Bearer <ID token>` dari `TokenProvider` (`FirebaseTokenProvider` → `currentUser.getIdToken()`) bila user login. Respons `401` → token di-refresh sekali (`forceRefresh`) dan request diulang sekali (penanda `extra['authRetried']`); `401` kedua, gagal refresh, atau user tidak login → error diteruskan.
+- Repository memanggil `api_client` lewat `apiCall(() => client.notes.getNote(id: id), map: noteFromDto)` (`core/network/api_call.dart`): `DioException` → `Err(failureFromDioException(e))`. Exception lain (bug mapper) tidak ditangkap.
+- `failureFromDioException` (`core/network/error_mapper.dart`) membaca body `ErrorBody` dan memetakan `ErrorCode` lewat `failureCodeOf` (switch tanpa `default`: kode baru di kontrak membuat `flutter analyze` gagal sampai dipetakan).
+
+### Teks UI dan l10n
+
+- Teks UI Bahasa Indonesia ditulis langsung di widget (satu bahasa, tanpa ARB). `AppLocale` (`core/l10n/app_locale.dart`) memasang locale `id` dan delegate Material/Cupertino agar teks bawaan widget juga Bahasa Indonesia.
+- D-03: teks kegagalan untuk user hanya dari `failureMessage(FailureCode)` dan `fieldIssueMessage(FieldIssue)` di `core/l10n/failure_messages.dart`, dengan `genericFailureMessage` sebagai cadangan. `Failure.message` dari server tidak pernah ditampilkan.
+
+### DI dan router
+
+- get_it dengan registrasi manual. `configureDependencies({config, auth, container})` (`core/di/injection.dart`) mendaftarkan `AppConfig`, `FirebaseAuth`, `TokenProvider`, `Dio`, `ApiClient`, lalu memanggil `registerXxxDependencies(container)` setiap fitur. `FirebaseAuth` diberikan dari luar agar test memakai mock; test memakai `GetIt.asNewInstance()`.
+- `getIt` hanya dipanggil di composition root (`main.dart`, router, `registerXxxDependencies`); widget dan Cubit menerima dependency lewat konstruktor.
+- go_router: path di `AppRoutes`, rute di `createRouter()` (`core/router/app_router.dart`), rute tidak dikenal → `NotFoundPage`. `App` menerima `router` opsional untuk test.
+
+### Test Flutter
+
+- Test di `apps/app/test/` mengikuti struktur `lib/` (`lib/core/network/auth_interceptor.dart` → `test/core/network/auth_interceptor_test.dart`). Helper test yang bukan test tanpa akhiran `_test.dart` (contoh: `test/core/network/fake_http_adapter.dart`).
+- Mock dengan `mocktail` (`class MockFirebaseAuth extends Mock implements FirebaseAuth {}`); Cubit dengan `bloc_test` (mulai T-014).
+- HTTP diuji lewat Dio sungguhan dengan `FakeHttpAdapter` (mencatat request, menjawab per request), bukan mock Dio. Contoh: `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`.
+- Test `config/dev.json` membaca file aslinya, jadi kunci yang hilang terdeteksi (`test/core/config/app_config_test.dart`).
+
 ## Belum diisi
 
-- Flutter: T-013 sampai T-016
-- Test: T-013 (Flutter)
+- Flutter: fitur auth (T-014) dan notes (T-015, T-016)
