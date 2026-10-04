@@ -13,4 +13,4 @@ UpdateNoteInput _$UpdateNoteInputFromJson(Map<String, dynamic> json) =>
     );
 
 Map<String, dynamic> _$UpdateNoteInputToJson(UpdateNoteInput instance) =>
-    <String, dynamic>{'title': instance.title, 'body': instance.body};
+    <String, dynamic>{'title': ?instance.title, 'body': ?instance.body};

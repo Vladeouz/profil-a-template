@@ -13,4 +13,4 @@ CreateNoteInput _$CreateNoteInputFromJson(Map<String, dynamic> json) =>
     );
 
 Map<String, dynamic> _$CreateNoteInputToJson(CreateNoteInput instance) =>
-    <String, dynamic>{'title': instance.title, 'body': instance.body};
+    <String, dynamic>{'title': instance.title, 'body': ?instance.body};

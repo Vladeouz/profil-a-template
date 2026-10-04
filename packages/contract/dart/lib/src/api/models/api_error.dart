@@ -21,6 +21,7 @@ class ApiError {
   
   final ErrorCode code;
   final String message;
+  @JsonKey(includeIfNull: false)
   final Map<String, List<ErrorIssue>>? details;
 
   Map<String, Object?> toJson() => _$ApiErrorToJson(this);

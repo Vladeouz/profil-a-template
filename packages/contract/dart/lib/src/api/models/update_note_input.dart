@@ -15,7 +15,9 @@ class UpdateNoteInput {
   
   factory UpdateNoteInput.fromJson(Map<String, Object?> json) => _$UpdateNoteInputFromJson(json);
   
+  @JsonKey(includeIfNull: false)
   final String? title;
+  @JsonKey(includeIfNull: false)
   final String? body;
 
   Map<String, Object?> toJson() => _$UpdateNoteInputToJson(this);

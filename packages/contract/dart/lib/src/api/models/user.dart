@@ -18,7 +18,9 @@ class User {
   factory User.fromJson(Map<String, Object?> json) => _$UserFromJson(json);
   
   final String id;
+  @JsonKey(includeIfNull: true)
   final String? email;
+  @JsonKey(includeIfNull: true)
   final String? displayName;
   final DateTime createdAt;
 

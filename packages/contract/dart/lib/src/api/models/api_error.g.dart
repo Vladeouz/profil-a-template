@@ -22,7 +22,7 @@ ApiError _$ApiErrorFromJson(Map<String, dynamic> json) => ApiError(
 Map<String, dynamic> _$ApiErrorToJson(ApiError instance) => <String, dynamic>{
   'code': _$ErrorCodeEnumMap[instance.code]!,
   'message': instance.message,
-  'details': instance.details,
+  'details': ?instance.details,
 };
 
 const _$ErrorCodeEnumMap = {

@@ -8,3 +8,5 @@ swagger_parser:
   root_client_name: ApiClient
   export_file: true
   unknown_enum_value: true
+  # Field opsional yang null tidak dikirim (API menolak null pada field optional()).
+  include_if_null: true

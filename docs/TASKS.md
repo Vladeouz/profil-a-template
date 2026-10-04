@@ -80,7 +80,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/app/lib/features/auth/{domain,data,presentation}/**`, `apps/app/lib/core/router/**`, `apps/app/test/features/auth/**`
   - done when: `flutter analyze` bersih; `flutter test` lulus dengan unit test use case, `bloc_test` untuk Cubit login, dan widget test redirect rute terlindungi; **(manual)** user memastikan daftar, login, pesan password salah, dan logout berjalan di Chrome dan Android emulator
 
-- [ ] T-015 Fitur contoh notes (Flutter): domain dan data
+- [x] T-015 Fitur contoh notes (Flutter): domain dan data
   - layer: app · depends_on: T-014 · refs: FR-13, NFR-05, NFR-06
   - files: `apps/app/lib/features/notes/{domain,data}/**`, `apps/app/test/features/notes/{domain,data}/**`
   - done when: `flutter analyze` bersih; `flutter test` lulus untuk setiap use case (repository di-mock) dan untuk repository impl + mapper (data source di-mock), termasuk pemetaan `NOT_FOUND` dan `VALIDATION_ERROR` beserta `details` ke `Failure`

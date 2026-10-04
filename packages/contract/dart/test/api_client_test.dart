@@ -123,4 +123,17 @@ void main() {
       ),
     );
   });
+
+  test('field opsional yang null tidak dikirim di body request', () {
+    expect(const UpdateNoteInput(body: 'Isi').toJson(), {'body': 'Isi'});
+    expect(const UpdateNoteInput(title: 'Judul').toJson(), {'title': 'Judul'});
+    expect(const CreateNoteInput(title: 'Judul').toJson(), {'title': 'Judul'});
+  });
+
+  test('field wajib yang nullable tetap dikirim sebagai null', () {
+    expect(const NotePage(items: [], nextCursor: null).toJson(), {
+      'items': <Object?>[],
+      'nextCursor': null,
+    });
+  });
 }

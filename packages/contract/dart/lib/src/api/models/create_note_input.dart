@@ -16,6 +16,7 @@ class CreateNoteInput {
   factory CreateNoteInput.fromJson(Map<String, Object?> json) => _$CreateNoteInputFromJson(json);
   
   final String title;
+  @JsonKey(includeIfNull: false)
   final String? body;
 
   Map<String, Object?> toJson() => _$CreateNoteInputToJson(this);

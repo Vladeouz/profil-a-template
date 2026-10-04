@@ -20,6 +20,7 @@ class NotePage {
   final List<Note> items;
 
   /// `null` di halaman terakhir
+  @JsonKey(includeIfNull: true)
   final String? nextCursor;
 
   Map<String, Object?> toJson() => _$NotePageToJson(this);

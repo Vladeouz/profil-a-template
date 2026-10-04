@@ -233,6 +233,7 @@ D-01, D-02: route Hono adalah satu-satunya sumber kebenaran. `packages/contract/
 - Yang ditulis tangan di package: `pubspec.yaml`, `swagger_parser.yaml`, `lib/api_client.dart` (mengekspor `src/api/export.dart`), dan `test/api_client_test.dart`. Test dijalankan dengan `dart test` di `packages/contract/dart`.
 - Nama komponen OpenAPI menjadi nama kelas Dart: setiap skema request, respons, dan objek bersarang yang penting diberi `.openapi('Nama')`. Tanpa nama, swagger_parser membuat nama sendiri (objek error tanpa nama menjadi kelas `Error` yang menutupi `dart:core`). Satu tag OpenAPI menjadi satu client (`NotesClient`, `UsersClient`, `SystemClient`), dirangkum `ApiClient`.
 - `ErrorCode` menjadi enum Dart dengan nilai `$unknown` untuk kode yang belum dikenal (`unknown_enum_value: true`); Flutter memetakan `$unknown` ke teks umum. Respons error sampai di dio sebagai `DioException` dengan `response.data` berupa `Map`, dibaca dengan `ErrorBody.fromJson`.
+- Field opsional yang `null` tidak dikirim di body request (`include_if_null: true` di `swagger_parser.yaml` → `@JsonKey(includeIfNull: false)`), karena API menolak `null` pada field `optional()` (`invalid_type`). Field wajib yang nullable (`nextCursor`, `User.email`) tetap ditulis sebagai `null`. Dijaga `packages/contract/dart/test/api_client_test.dart` dan `apps/app/test/features/notes/data/note_remote_data_source_test.dart`.
 - Waktu: `build_runner` pertama ~35–45 detik (kompilasi builder; juga berlaku untuk `contract:check` bila `dart/.dart_tool` belum ada, misalnya di CI). Setelah itu `contract:check` ~6 detik karena `.dart_tool` ikut disalin ke folder sementara.
 
 ## Flutter
@@ -311,6 +312,30 @@ features/auth/
 - Form login dan daftar: `AuthForm` + `AuthFormState` (sealed `Idle`/`Submitting`/`Failed(failure)`/`Succeeded`). Validasi lokal hanya "wajib diisi"; aturan lain dari Firebase. Perpindahan halaman setelah berhasil dilakukan router, bukan halaman.
 - Cubit yang menunggu `Future` memeriksa `isClosed` sebelum `emit` dan mengabaikan submit kedua saat `Submitting` (`features/auth/presentation/cubit/login_cubit.dart`).
 
+### Fitur berbasis API (contoh: notes)
+
+Contoh lengkap: `apps/app/lib/features/notes/` (fitur CONTOH, pasangan `apps/api/src/features/notes/`).
+
+```
+features/notes/
+├── notes_dependencies.dart           # registerNotesDependencies(GetIt)
+├── domain/
+│   ├── entities/                     # note.dart, note_page.dart
+│   ├── repositories/                 # note_repository.dart
+│   └── usecases/                     # list_notes, get_note, create_note, update_note, delete_note
+└── data/
+    ├── note_remote_data_source.dart  # membungkus NotesClient, mengembalikan DTO, melempar DioException
+    ├── note_mapper.dart              # DTO → entity (noteFromDto, notePageFromDto)
+    └── api_note_repository.dart      # apiCall(() => _remote.xxx(), map: ...) → Result
+```
+
+- Data source satu kelas per resource di atas client hasil generate (`c<ApiClient>().notes`): menerima parameter Dart biasa, membuat DTO input (`CreateNoteInput`, `UpdateNoteInput`), dan mengembalikan DTO respons. Tidak menangkap exception.
+- Repository impl memanggil data source lewat `apiCall`/`apiCallRaw`, tanpa pemetaan error per fitur: `NOT_FOUND` → `FailureCode.notFound`, `VALIDATION_ERROR` → `FailureCode.validation` dengan `fieldErrors` dari `details` (kunci `title`, `_root`, `cursor`), semuanya lewat `failureFromDioException`.
+- File di `data/` mengimpor `api_client` dengan prefix (`import 'package:api_client/api_client.dart' as dto;`) karena nama DTO sama dengan entity (`dto.Note` vs `Note`). `domain/` tidak pernah mengimpor `api_client`.
+- Entity memakai `DateTime` UTC dari DTO apa adanya; konversi ke waktu lokal hanya di presentation. Daftar memakai entity halaman sendiri (`NotePage`: `items`, `nextCursor`, `hasMore`).
+- Parameter opsional `null` berarti "tidak dikirim": `limit` `null` = bawaan API (20), `body` `null` saat membuat = tidak dikirim (API menyimpan `''`), field `null` saat mengubah = tidak diubah.
+- Use case hanya menormalisasi input (`title.trim()`) lalu meneruskan ke repository; wajib diisi, batas panjang, dan minimal satu field ditegakkan API (lihat Aturan bisnis: API vs client).
+
 ### Test Flutter
 
 - Test di `apps/app/test/` mengikuti struktur `lib/` (`lib/core/network/auth_interceptor.dart` → `test/core/network/auth_interceptor_test.dart`). Helper test yang bukan test tanpa akhiran `_test.dart` (contoh: `test/core/network/fake_http_adapter.dart`).
@@ -318,8 +343,9 @@ features/auth/
 - Use case: satu file test per use case, repository di-mock (`test/features/auth/domain/usecases/sign_in_test.dart`). Cubit: `blocTest` (`test/features/auth/presentation/cubit/login_cubit_test.dart`). Halaman: widget test dengan Cubit mock + `whenListen` (`test/features/auth/presentation/pages/login_page_test.dart`).
 - Router: widget test dengan wiring fitur asli (`registerAuthDependencies` pada `GetIt.asNewInstance()`) dan repository diganti fake dalam memori (`test/features/auth/fake_auth_repository.dart`), lalu `App(router: createRouter(container: c))` (`test/core/router/app_router_test.dart`).
 - HTTP diuji lewat Dio sungguhan dengan `FakeHttpAdapter` (mencatat request, menjawab per request), bukan mock Dio. Contoh: `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`.
+- Fitur berbasis API: use case dengan repository di-mock (`test/features/notes/domain/usecases/*_test.dart`); repository impl dengan data source di-mock yang melempar `DioException.badResponse` berisi body error standar (`test/features/notes/data/api_note_repository_test.dart`); data source dengan `NotesClient` asli + `FakeHttpAdapter` untuk memeriksa method, path, query, dan body request (`test/features/notes/data/note_remote_data_source_test.dart`). Fixture entity dan JSON (`testNote`, `noteJson`) di `test/features/notes/mocks.dart`.
 - Test `config/dev.json` membaca file aslinya, jadi kunci yang hilang terdeteksi (`test/core/config/app_config_test.dart`).
 
 ## Belum diisi
 
-- Flutter: fitur notes (T-015, T-016)
+- Flutter: presentation fitur notes (T-016)
