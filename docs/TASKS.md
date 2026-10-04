@@ -63,7 +63,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
 
 ## Fase 2 — Kontrak
 
-- [ ] T-012 Pipeline kontrak: `contract:generate` dan `contract:check`
+- [x] T-012 Pipeline kontrak: `contract:generate` dan `contract:check`
   - layer: contract · depends_on: T-003, T-011 · refs: FR-10, D-01, D-02
   - files: `apps/api/scripts/export-openapi.ts`, `packages/contract/openapi.json`, `packages/contract/dart/**`, `scripts/contract.mjs`, `package.json`
   - done when: `pnpm contract:generate` memperbarui `openapi.json` dan `api_client` yang lolos `dart analyze`; `ErrorCode` muncul sebagai enum; `pnpm contract:check` lulus saat sinkron, dan terbukti gagal (dengan nama file yang tidak sinkron) setelah satu field route diubah sementara tanpa generate ulang

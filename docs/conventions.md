@@ -29,6 +29,14 @@ Library dipin ke versi pasti (tanpa `^` atau `~`) saat pertama dipasang, lalu di
 | `@types/pg` | 8.23.1 | T-006 |
 | `firebase-admin` | 14.5.0 | T-007 |
 | `pg-boss` | 12.36.0 | T-009 |
+| `swagger_parser` (Dart, dev) | 1.45.0 | T-012 |
+| `build_runner` (Dart, dev) | 2.16.1 | T-012 |
+| `json_serializable` (Dart, dev) | 6.14.1 | T-012 |
+| `retrofit_generator` (Dart, dev) | 10.2.11 | T-012 |
+| `test` (Dart, dev) | 1.32.0 | T-012 |
+| `dio` (Dart) | 5.11.1 | T-012 |
+| `retrofit` (Dart) | 4.10.0 | T-012 |
+| `json_annotation` (Dart) | 4.12.0 | T-012 |
 
 Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`. Build script yang tidak dibutuhkan didaftarkan dengan nilai `false` beserta alasannya di komentar (saat ini `@firebase/util` dan `protobufjs`, dependency `firebase-admin`); jangan biarkan nilai placeholder `set this to true or false` yang ditulis pnpm.
 
@@ -199,8 +207,20 @@ features/<fitur>/
 - `createApp()` di `src/app.ts` adalah composition root: buat repository dari `db`, rakit use case, lalu `registerXxxRoutes(app, { ...useCases })`. Route menerima use case lewat parameter, bukan membuatnya sendiri.
 - Route: path param `id` divalidasi `z.uuid()` (bukan UUID → `422 details.id`); body POST/PATCH memakai `request.body.required: true`; PATCH memakai skema dengan semua field opsional + `.refine()` minimal satu field (→ `details._root`); `DELETE` mengembalikan `c.body(null, 204)`. Skema request dan respons diberi nama `.openapi('Note')`, `'CreateNoteInput'`, `'UpdateNoteInput'`, `'NotePage'`.
 
+## Kontrak dan client Dart
+
+D-01, D-02: route Hono adalah satu-satunya sumber kebenaran. `packages/contract/openapi.json` (OpenAPI 3.1) dan package Dart `api_client` di `packages/contract/dart/` adalah hasil generate yang di-commit; jangan diedit manual.
+
+- `pnpm contract:generate` (`scripts/contract.mjs`): `apps/api/scripts/export-openapi.ts` menulis `openapi.json` dari `createApp()` (tanpa `.env`, Docker, atau koneksi database), lalu `dart pub get`, hapus `dart/lib/src/api/`, `dart run swagger_parser`, `dart run build_runner build`, dan `dart analyze`. Jalankan setiap kali route atau skema Zod berubah, lalu commit hasilnya bersama perubahan route.
+- `pnpm contract:check`: generate ulang di salinan sementara (working tree tidak disentuh), lalu membandingkan byte per byte `openapi.json` dan semua file di `dart/lib/src/api/`. Gagal (exit 1) dengan daftar file yang berbeda, belum ada di repo, atau tidak lagi dihasilkan generator.
+- `openapi.json` diformat Biome setelah export (lewat stdin, memakai `biome.json`), sehingga `pnpm lint` bersih dan hasilnya deterministik.
+- File Dart hasil generate **tidak** diformat ulang (`dart format` tidak dijalankan pada `lib/src/api/`); `contract:check` membandingkan hasil generate apa adanya. Hasilnya deterministik selama versi generator sama, karena itu `dart/pubspec.lock` di-commit.
+- Yang ditulis tangan di package: `pubspec.yaml`, `swagger_parser.yaml`, `lib/api_client.dart` (mengekspor `src/api/export.dart`), dan `test/api_client_test.dart`. Test dijalankan dengan `dart test` di `packages/contract/dart`.
+- Nama komponen OpenAPI menjadi nama kelas Dart: setiap skema request, respons, dan objek bersarang yang penting diberi `.openapi('Nama')`. Tanpa nama, swagger_parser membuat nama sendiri (objek error tanpa nama menjadi kelas `Error` yang menutupi `dart:core`). Satu tag OpenAPI menjadi satu client (`NotesClient`, `UsersClient`, `SystemClient`), dirangkum `ApiClient`.
+- `ErrorCode` menjadi enum Dart dengan nilai `$unknown` untuk kode yang belum dikenal (`unknown_enum_value: true`); Flutter memetakan `$unknown` ke teks umum. Respons error sampai di dio sebagai `DioException` dengan `response.data` berupa `Map`, dibaca dengan `ErrorBody.fromJson`.
+- Waktu: `build_runner` pertama ~35–45 detik (kompilasi builder; juga berlaku untuk `contract:check` bila `dart/.dart_tool` belum ada, misalnya di CI). Setelah itu `contract:check` ~6 detik karena `.dart_tool` ikut disalin ke folder sementara.
+
 ## Belum diisi
 
-- Kontrak dan client Dart: T-012
 - Flutter: T-013 sampai T-016
 - Test: T-013 (Flutter)
