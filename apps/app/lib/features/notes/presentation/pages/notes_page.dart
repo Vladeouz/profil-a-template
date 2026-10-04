@@ -15,13 +15,43 @@ import 'package:app/features/notes/presentation/widgets/note_tile.dart';
 /// Daftar note milik user. Butuh [NotesListCubit] dari `BlocProvider` (dipasang router).
 ///
 /// Form dibuka dengan `context.push`; hasilnya (`NoteFormSaved`/`NoteFormDeleted`)
-/// diterapkan ke daftar tanpa memuat ulang.
-class NotesPage extends StatelessWidget {
+/// diterapkan ke daftar tanpa memuat ulang. Kembali tanpa hasil (tombol kembali, atau
+/// form dibuka lewat URL sehingga hasilnya tidak sampai ke sini) memuat ulang halaman
+/// pertama.
+class NotesPage extends StatefulWidget {
   const NotesPage({super.key});
 
-  Future<void> _openForm(BuildContext context, {Note? note}) async {
+  @override
+  State<NotesPage> createState() => _NotesPageState();
+}
+
+class _NotesPageState extends State<NotesPage> {
+  /// Rute halaman ini paling atas (tidak tertutup form).
+  bool? _isCurrent;
+
+  /// Form di atas halaman ini dibuka lewat [_openForm], yang menangani hasilnya sendiri.
+  bool _openedHere = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isCurrent = ModalRoute.isCurrentOf(context) ?? true;
+    final returned = _isCurrent == false && isCurrent;
+    _isCurrent = isCurrent;
+    if (!returned) return;
+    if (_openedHere) {
+      _openedHere = false;
+    } else {
+      // Form dibuka lewat URL (misalnya `/notes/<id>` dimuat ulang di web): hasilnya
+      // tidak kembali ke daftar ini, jadi ambil ulang dari API.
+      context.read<NotesListCubit>().load();
+    }
+  }
+
+  Future<void> _openForm({Note? note}) async {
     final cubit = context.read<NotesListCubit>();
     final location = note == null ? AppRoutes.noteNew : AppRoutes.note(note.id);
+    _openedHere = true;
     final result = await context.push<NoteFormState>(location, extra: note);
     switch (result) {
       case NoteFormSaved(:final note):
@@ -29,7 +59,7 @@ class NotesPage extends StatelessWidget {
       case NoteFormDeleted(:final id):
         cubit.noteDeleted(id);
       case _:
-        break;
+        cubit.load();
     }
   }
 
@@ -42,7 +72,7 @@ class NotesPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Catatan baru',
-        onPressed: () => _openForm(context),
+        onPressed: () => _openForm(),
         child: const Icon(Icons.add),
       ),
       body: BlocBuilder<NotesListCubit, NotesListState>(
@@ -72,7 +102,7 @@ class NotesPage extends StatelessWidget {
               return NoteTile(
                 key: ValueKey(note.id),
                 note: note,
-                onTap: () => _openForm(context, note: note),
+                onTap: () => _openForm(note: note),
               );
             },
           ),

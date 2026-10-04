@@ -178,6 +178,23 @@ void main() {
     expect(notes.notes.single.title, 'Catatan 1');
   });
 
+  testWidgets('kembali dari form tanpa hasil → halaman pertama dimuat ulang', (
+    tester,
+  ) async {
+    setUpNotes(initialCount: 1);
+    await pumpApp(tester);
+
+    await tester.tap(find.text('Catatan 1'));
+    await tester.pumpAndSettle();
+    // Data berubah di luar daftar ini (misalnya dari perangkat lain).
+    await notes.create(title: 'Dari tempat lain');
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dari tempat lain'), findsOneWidget);
+    expect(find.text('Catatan 1'), findsOneWidget);
+  });
+
   group('dibuka lewat URL', () {
     testWidgets('/notes/<id> → note dimuat dari API', (tester) async {
       setUpNotes(initialCount: 2);
@@ -187,6 +204,28 @@ void main() {
       expect(find.text('Catatan 2'), findsOneWidget);
       expect(find.text('Isi 2'), findsOneWidget);
     });
+
+    testWidgets(
+      '/notes/<id>, simpan, kembali → daftar menampilkan data terbaru',
+      (tester) async {
+        setUpNotes(initialCount: 2);
+        final router = await pumpApp(
+          tester,
+          initialLocation: AppRoutes.note('note-1'),
+        );
+
+        await tester.enterText(find.byKey(const Key('note-title')), 'Diubah');
+        await save(tester);
+
+        expect(find.byType(NoteFormPage), findsNothing);
+        expect(pathOf(router), AppRoutes.notes);
+        final titles = tester
+            .widgetList<ListTile>(find.byType(ListTile))
+            .map((tile) => (tile.title! as Text).data)
+            .toList();
+        expect(titles, ['Catatan 2', 'Diubah']);
+      },
+    );
 
     testWidgets('/notes/<id> yang tidak ada → "Data tidak ditemukan."', (
       tester,
