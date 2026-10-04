@@ -2,6 +2,7 @@ import type { App } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { getStorage } from 'firebase-admin/storage';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PortNotConfiguredError } from '../../../../src/core/ports/adapters/none.js';
 import { createPorts, type PortsEnv } from '../../../../src/core/ports/create-ports.js';
 
 // firebase-admin di-mock: test ini hanya memeriksa adapter mana yang dipilih dari env dan bahwa
@@ -31,6 +32,17 @@ beforeEach(() => {
 });
 
 describe('createPorts', () => {
+  it('uses the none adapters, which fail on use, without creating firebase-admin clients', async () => {
+    const ports = createPorts({ PUSH_ADAPTER: 'none', STORAGE_ADAPTER: 'none' }, app);
+
+    expect(getMessaging).not.toHaveBeenCalled();
+    expect(getStorage).not.toHaveBeenCalled();
+    await expect(
+      ports.pushSender.send({ token: 'device-1', title: 't', body: 'b' }),
+    ).rejects.toBeInstanceOf(PortNotConfiguredError);
+    await expect(ports.fileStorage.read('a.txt')).rejects.toBeInstanceOf(PortNotConfiguredError);
+  });
+
   it('uses the fake adapters without creating firebase-admin clients', async () => {
     const ports = createPorts(fakes, app);
 

@@ -6,6 +6,7 @@ import { createFakePushSender } from './adapters/fake-push.js';
 import { createFakeFileStorage } from './adapters/fake-storage.js';
 import { createFcmPushSender } from './adapters/fcm-push.js';
 import { createFirebaseFileStorage } from './adapters/firebase-storage.js';
+import { createNoneFileStorage, createNonePushSender } from './adapters/none.js';
 import type { FileStorage } from './file-storage.js';
 import type { PushSender } from './push-sender.js';
 
@@ -19,15 +20,31 @@ export type PortsEnv = Pick<Env, 'PUSH_ADAPTER' | 'STORAGE_ADAPTER' | 'FIREBASE_
 // Memilih adapter dari env. Klien firebase-admin hanya dibuat untuk adapter yang memakainya.
 export function createPorts(env: PortsEnv, firebaseApp: App): Ports {
   return {
-    pushSender:
-      env.PUSH_ADAPTER === 'fcm'
-        ? createFcmPushSender(getMessaging(firebaseApp))
-        : createFakePushSender(),
-    fileStorage:
-      env.STORAGE_ADAPTER === 'firebase'
-        ? createFirebaseFileStorage(getStorage(firebaseApp).bucket(requireBucket(env)))
-        : createFakeFileStorage(),
+    pushSender: createPushSender(env, firebaseApp),
+    fileStorage: createFileStorage(env, firebaseApp),
   };
+}
+
+function createPushSender(env: PortsEnv, firebaseApp: App): PushSender {
+  switch (env.PUSH_ADAPTER) {
+    case 'fcm':
+      return createFcmPushSender(getMessaging(firebaseApp));
+    case 'fake':
+      return createFakePushSender();
+    case 'none':
+      return createNonePushSender();
+  }
+}
+
+function createFileStorage(env: PortsEnv, firebaseApp: App): FileStorage {
+  switch (env.STORAGE_ADAPTER) {
+    case 'firebase':
+      return createFirebaseFileStorage(getStorage(firebaseApp).bucket(requireBucket(env)));
+    case 'fake':
+      return createFakeFileStorage();
+    case 'none':
+      return createNoneFileStorage();
+  }
 }
 
 // `loadEnv()` sudah mewajibkannya untuk adapter `firebase`; dicek ulang untuk env buatan tangan.

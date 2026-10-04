@@ -31,15 +31,17 @@ const EnvObject = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
-  // D-06: adapter port push dan storage (`src/core/ports/create-ports.ts`).
-  PUSH_ADAPTER: z.enum(['fake', 'fcm']).default('fake'),
-  STORAGE_ADAPTER: z.enum(['fake', 'firebase']).default('fake'),
+  // D-06: adapter port push dan storage (`src/core/ports/create-ports.ts`). Tidak di-set = `none`:
+  // port melempar error saat dipakai, jadi lupa mengonfigurasi terlihat, bukan diam-diam palsu.
+  PUSH_ADAPTER: z.enum(['none', 'fake', 'fcm']).default('none'),
+  STORAGE_ADAPTER: z.enum(['none', 'fake', 'firebase']).default('none'),
   // Nama bucket, misalnya `demo-template.appspot.com`. Wajib bila STORAGE_ADAPTER=firebase.
   FIREBASE_STORAGE_BUCKET: z.string().min(1).optional(),
   FIREBASE_STORAGE_EMULATOR_HOST: EmulatorHost.optional(),
 });
 
 const EMULATOR_HOSTS = ['FIREBASE_AUTH_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST'] as const;
+const ADAPTERS = ['PUSH_ADAPTER', 'STORAGE_ADAPTER'] as const;
 
 const EnvSchema = EnvObject.superRefine((env, ctx) => {
   // Dengan emulator, firebase-admin menerima token tanpa tanda tangan dan menulis file ke emulator;
@@ -51,6 +53,16 @@ const EnvSchema = EnvObject.superRefine((env, ctx) => {
           code: 'custom',
           path: [key],
           message: 'Must not be set when NODE_ENV=production',
+        });
+      }
+    }
+    // Adapter palsu tidak mengirim push dan tidak menyimpan file secara permanen.
+    for (const key of ADAPTERS) {
+      if (env[key] === 'fake') {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: 'Must not be fake when NODE_ENV=production',
         });
       }
     }

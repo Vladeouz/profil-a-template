@@ -78,7 +78,7 @@ Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan
 - `pnpm --filter api dev` dan `start` membaca `../../.env` lewat `--env-file-if-exists`; variabel yang sudah di-set di shell menang.
 - `FIREBASE_PROJECT_ID` wajib. `FIREBASE_AUTH_EMULATOR_HOST` (`host:port`) opsional; bila di-set, firebase-admin memverifikasi token ke Auth Emulator. Ditolak bila `NODE_ENV=production`.
 - `RUN_WORKER` opsional, hanya `true` atau `false` (tidak di-set = `false`). Lihat bagian Job.
-- `PUSH_ADAPTER` (`fake`/`fcm`) dan `STORAGE_ADAPTER` (`fake`/`firebase`) opsional, default `fake`. `FIREBASE_STORAGE_BUCKET` wajib bila `STORAGE_ADAPTER=firebase`. `FIREBASE_STORAGE_EMULATOR_HOST` (`host:port`) opsional, ditolak bila `NODE_ENV=production`. Lihat bagian Port push dan storage.
+- `PUSH_ADAPTER` (`none`/`fake`/`fcm`) dan `STORAGE_ADAPTER` (`none`/`fake`/`firebase`) opsional, default `none`; `fake` ditolak bila `NODE_ENV=production`. `FIREBASE_STORAGE_BUCKET` wajib bila `STORAGE_ADAPTER=firebase`. `FIREBASE_STORAGE_EMULATOR_HOST` (`host:port`) opsional, ditolak bila `NODE_ENV=production`. Lihat bagian Port push dan storage.
 - `CORS_ORIGINS` wajib, daftar origin dipisah koma (misalnya `http://localhost:8081` untuk Flutter web). Origin lain tidak mendapat `Access-Control-Allow-Origin`. Lihat `apps/api/src/core/http/cors.ts`.
 
 ### Logger
@@ -120,12 +120,14 @@ Test: `test/int/jobs/boss.int.test.ts` (start, jadwal, job diproses, `RUN_WORKER
 
 D-06: layanan luar yang tidak punya emulator atau aturannya berbeda per proyek dipakai lewat port (interface) di `apps/api/src/core/ports/`, dengan adapter di `core/ports/adapters/`. Use case hanya mengimpor port, tidak pernah firebase-admin.
 
+- Adapter `none` (`adapters/none.ts`) adalah default bila env adapter tidak di-set: server tetap start, tetapi setiap pemakaian port melempar `PortNotConfiguredError` yang menyebut env yang harus di-set (`PushSender is not configured: set PUSH_ADAPTER to fcm or fake`). Di route, error ini menjadi `500 INTERNAL_ERROR` dan pesannya tercatat di log. Proyek yang tidak memakai push atau storage cukup membiarkannya `none`.
+- Adapter `fake` hanya untuk development dan test; `loadEnv()` menolaknya bila `NODE_ENV=production` (sama seperti host emulator), sehingga server tidak start.
 - `PushSender.send({ token, title, body, data? })` (`push-sender.ts`) → `{ status: 'sent', messageId }` atau `{ status: 'invalid-token' }` (token tidak terdaftar atau formatnya salah; pemanggil menghapus token itu). Kegagalan lain dilempar. Adapter: `fake-push.ts` (mencatat pesan di `sent`, `markInvalid(token)` untuk mensimulasikan token mati) dan `fcm-push.ts` (firebase-admin messaging; tidak ada emulator FCM, jadi hanya diuji dengan mock; di produksi butuh Application Default Credentials).
 - `FileStorage` (`file-storage.ts`): `save(path, data, { contentType })` menimpa file lama, `read(path)` → `{ data, contentType }` atau `null`, `delete(path)` tidak error bila file tidak ada. Adapter: `fake-storage.ts` (di memori, `paths()` untuk test) dan `firebase-storage.ts` (bucket firebase-admin; memakai Storage Emulator bila `FIREBASE_STORAGE_EMULATOR_HOST` di-set). Akses lewat firebase-admin tidak terikat `storage.rules`.
 - Path file relatif dengan segmen dipisah `/` (`users/<id>/avatar.png`), divalidasi `assertValidFilePath` di setiap adapter: tanpa `/` di awal atau akhir, segmen kosong, `.`/`..`, backslash, karakter kontrol, maksimal 1024 karakter. Path tidak valid → `InvalidFilePathError` sebelum ada request ke Storage.
-- Adapter dipilih dari env oleh `createPorts(env, firebaseApp)` (`core/ports/create-ports.ts`) di `src/server.ts`, lalu masuk ke `createApp` lewat `AppDeps.ports` untuk dirakit ke use case. Klien firebase-admin hanya dibuat untuk adapter yang dipakai. Server mencatat adapter yang dipilih di log `API listening` dan memberi peringatan bila adapter `fake` dipakai saat `NODE_ENV=production`.
+- Adapter dipilih dari env oleh `createPorts(env, firebaseApp)` (`core/ports/create-ports.ts`) di `src/server.ts`, lalu masuk ke `createApp` lewat `AppDeps.ports` untuk dirakit ke use case. Klien firebase-admin hanya dibuat untuk adapter yang dipakai. Server mencatat adapter yang dipilih di log `API listening`.
 - Test: `createTestApp()` memakai kedua adapter palsu; test yang perlu memeriksa pesan atau file memberi `ports` sendiri. Integration test Storage Emulator di `test/int/ports/firebase-storage.int.test.ts` memakai prefix acak per run dan menghapus file-nya sendiri (emulator tidak dibersihkan).
-- Layanan luar baru (email, SMS, pembayaran) mengikuti pola yang sama: port + adapter `fake` + adapter sungguhan + pilihan `XXX_ADAPTER` di env.
+- Layanan luar baru (email, SMS, pembayaran) mengikuti pola yang sama: port + adapter `none` (default, melempar saat dipakai) + adapter `fake` (ditolak di produksi) + adapter sungguhan + pilihan `XXX_ADAPTER` di env.
 
 ## Pagination
 

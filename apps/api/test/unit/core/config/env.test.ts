@@ -18,8 +18,8 @@ describe('loadEnv', () => {
       DATABASE_URL,
       FIREBASE_PROJECT_ID: 'demo-template',
       RUN_WORKER: false,
-      PUSH_ADAPTER: 'fake',
-      STORAGE_ADAPTER: 'fake',
+      PUSH_ADAPTER: 'none',
+      STORAGE_ADAPTER: 'none',
     });
   });
 
@@ -34,6 +34,41 @@ describe('loadEnv', () => {
     expect(env.PUSH_ADAPTER).toBe('fcm');
     expect(env.STORAGE_ADAPTER).toBe('firebase');
     expect(env.FIREBASE_STORAGE_BUCKET).toBe('demo-template.appspot.com');
+  });
+
+  it.each([
+    ['PUSH_ADAPTER', 'none'],
+    ['PUSH_ADAPTER', 'fake'],
+    ['PUSH_ADAPTER', 'fcm'],
+    ['STORAGE_ADAPTER', 'none'],
+    ['STORAGE_ADAPTER', 'fake'],
+  ])('accepts %s=%s outside production', (key, value) => {
+    expect(loadEnv({ ...base, [key]: value })[key as 'PUSH_ADAPTER']).toBe(value);
+  });
+
+  it.each(['PUSH_ADAPTER', 'STORAGE_ADAPTER'])(
+    'rejects %s=fake when NODE_ENV=production',
+    (key) => {
+      const production = { ...base, NODE_ENV: 'production' };
+
+      expect(() => loadEnv({ ...production, [key]: 'fake' })).toThrow(
+        `Must not be fake when NODE_ENV=production\n  → at ${key}`,
+      );
+    },
+  );
+
+  it('accepts none and the real adapters when NODE_ENV=production', () => {
+    const production = { ...base, NODE_ENV: 'production' };
+
+    expect(loadEnv(production)).toMatchObject({ PUSH_ADAPTER: 'none', STORAGE_ADAPTER: 'none' });
+    expect(
+      loadEnv({
+        ...production,
+        PUSH_ADAPTER: 'fcm',
+        STORAGE_ADAPTER: 'firebase',
+        FIREBASE_STORAGE_BUCKET: 'demo-template.appspot.com',
+      }),
+    ).toMatchObject({ PUSH_ADAPTER: 'fcm', STORAGE_ADAPTER: 'firebase' });
   });
 
   it.each([

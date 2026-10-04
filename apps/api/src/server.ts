@@ -34,17 +34,6 @@ const app = createApp({
   ports: createPorts(env, firebase.app),
 });
 
-// Adapter palsu tidak mengirim push dan tidak menyimpan file secara permanen.
-if (
-  env.NODE_ENV === 'production' &&
-  (env.PUSH_ADAPTER === 'fake' || env.STORAGE_ADAPTER === 'fake')
-) {
-  logger.warn(
-    { pushAdapter: env.PUSH_ADAPTER, storageAdapter: env.STORAGE_ADAPTER },
-    'fake port adapter in production',
-  );
-}
-
 let boss: Awaited<ReturnType<typeof startBoss>>;
 try {
   boss = await startBoss({
