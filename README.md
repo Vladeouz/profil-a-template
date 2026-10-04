@@ -17,17 +17,93 @@ Rencana dan status pembangunan template ada di `docs/PRD.md` dan `docs/TASKS.md`
 | Android SDK + emulator | tidak | hanya untuk verifikasi Android |
 | File `.env` | ya | salin sendiri dari `.env.example` |
 
-## Mulai
+## Dari clone sampai `pnpm check` hijau
 
-```sh
-corepack enable
-pnpm install
-pnpm prereq
-```
+Perintah dijalankan dari root repo (kecuali disebut lain) dan berlaku di CMD, PowerShell, Git Bash, maupun Linux.
+
+1. Pasang prasyarat di atas, lalu aktifkan pnpm dan pasang dependency:
+
+   ```sh
+   corepack enable
+   pnpm install
+   ```
+
+2. Buat `.env` dari contohnya (sesuaikan isinya bila perlu):
+
+   ```sh
+   copy .env.example .env
+   ```
+
+   Di Git Bash atau Linux: `cp .env.example .env`.
+
+3. Periksa prasyarat sampai semua baris wajib berstatus OK:
+
+   ```sh
+   pnpm prereq
+   ```
+
+4. Nyalakan Docker Desktop, lalu jalankan layanan lokal (build pertama image emulator butuh sekitar 5–7 menit):
+
+   ```sh
+   docker compose up -d --wait
+   ```
+
+5. Jalankan seluruh verifikasi:
+
+   ```sh
+   pnpm check
+   ```
+
+   Hijau bila ringkasan di akhir menampilkan `Semua 7 langkah OK.`
+
+### `pnpm prereq`
 
 `pnpm prereq` menampilkan tabel status setiap prasyarat beserta perintah perbaikannya, dan keluar dengan exit code bukan 0 bila ada prasyarat wajib yang gagal. Script ini tidak pernah membuat atau mengubah file.
 
 > Jangan tertukar dengan `pnpm doctor`: itu perintah bawaan pnpm untuk mendiagnosa instalasi pnpm sendiri.
+
+## `pnpm check`
+
+Menjalankan berurutan: Biome (`pnpm lint`), typecheck API, unit test API, integration test API, `pnpm contract:check`, `flutter analyze`, dan `flutter test`. Langkah yang gagal tidak menghentikan langkah berikutnya; di akhir tampil ringkasan status dan waktu per langkah, dan exit code bukan 0 bila ada langkah yang gagal. Output langkah yang gagal ada di atas ringkasan.
+
+- Integration test butuh layanan lokal (`docker compose up -d --wait`). Bila Docker mati, langkah itu gagal dengan pesan yang menyebut Docker.
+- Waktu total sekitar 1 menit di laptop pengembang (target di bawah 5 menit), setelah dependency terpasang dan image emulator sudah ada. `contract:check` pertama kali bisa lebih lama karena `dart pub get`.
+- Integration test memakai database `<POSTGRES_DB>_test` tersendiri, jadi aman dijalankan saat API sedang berjalan.
+
+## Menjalankan API dan Flutter
+
+Butuh layanan lokal (`docker compose up -d --wait`) dan `.env`.
+
+1. Migrasi database utama (sekali, dan setiap ada migrasi baru):
+
+   ```sh
+   pnpm --filter api db:migrate
+   ```
+
+2. Jalankan API di `http://localhost:3000` (reload otomatis saat kode berubah); cek dengan membuka `http://localhost:3000/health`:
+
+   ```sh
+   pnpm --filter api dev
+   ```
+
+3. Di terminal lain, jalankan Flutter dari folder `apps/app`:
+
+   ```sh
+   cd apps/app
+   flutter run -d chrome --web-port 8081 --dart-define-from-file=config/dev.json
+   ```
+
+   Port web harus `8081`, karena hanya origin itu yang diizinkan `CORS_ORIGINS` di `.env`.
+
+   Android emulator: nyalakan emulator, lihat id-nya dengan `flutter devices` (misalnya `emulator-5554`), lalu:
+
+   ```sh
+   flutter run -d emulator-5554 --dart-define-from-file=config/dev.json
+   ```
+
+   Di Android, host `localhost` di `config/dev.json` otomatis diganti `10.0.2.2`. Lihat juga bagian "Lingkungan Flutter dan Android" di `docs/conventions.md` sebelum build Android pertama.
+
+Akun dibuat lewat tombol daftar di aplikasi dan disimpan di Auth Emulator (hanya di memori: hilang saat container emulator di-restart atau dibuat ulang).
 
 ## Layanan lokal
 
@@ -54,5 +130,6 @@ docker compose up -d --wait
 | Perintah | Fungsi |
 | --- | --- |
 | `pnpm prereq` | Memeriksa prasyarat lingkungan |
+| `pnpm check` | Menjalankan semua verifikasi (lint, typecheck, test API, kontrak, Flutter) |
 | `pnpm lint` | Lint dan cek format dengan Biome (`biome check .`) |
 | `pnpm format` | Memperbaiki format dan lint yang bisa diperbaiki otomatis |

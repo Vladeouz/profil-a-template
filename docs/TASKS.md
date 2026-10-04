@@ -92,7 +92,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
 
 ## Fase 4 — Integrasi dan penyelesaian
 
-- [ ] T-017 `pnpm check` dan panduan menjalankan lokal
+- [x] T-017 `pnpm check` dan panduan menjalankan lokal
   - layer: infra · depends_on: T-016 · refs: FR-03, NFR-01, NFR-02
   - files: `scripts/check.mjs`, `package.json`, `README.md`
   - done when: `pnpm check` menjalankan semua langkah FR-03 dan menampilkan ringkasan; terbukti exit code bukan 0 saat satu langkah sengaja digagalkan; waktu total dicatat di log (target di bawah 5 menit); README berisi urutan dari clone sampai `pnpm check` hijau, termasuk perintah menjalankan API dan Flutter (`--web-port 8081`)

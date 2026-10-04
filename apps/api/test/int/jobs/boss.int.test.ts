@@ -90,10 +90,12 @@ describe('startBoss', () => {
       }),
     ).rejects.toThrow();
 
-    // Koneksi pg-boss (application_name `pgboss:<id>`) sudah ditutup.
+    // Koneksi pg-boss (application_name `pgboss:<id>`) ke database test sudah ditutup. Dibatasi ke
+    // database ini karena API yang sedang berjalan (`RUN_WORKER=true`) punya koneksi pg-boss sendiri
+    // ke database utama.
     await vi.waitFor(async () => {
       const { rows } = await getDb().pool.query(
-        "select count(*)::int as n from pg_stat_activity where application_name like 'pgboss%'",
+        "select count(*)::int as n from pg_stat_activity where application_name like 'pgboss%' and datname = current_database()",
       );
       expect(rows[0].n).toBe(0);
     });
