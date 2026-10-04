@@ -75,7 +75,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/app/pubspec.yaml`, `apps/app/analysis_options.yaml`, `apps/app/config/dev.json`, `apps/app/lib/{main,app}.dart`, `apps/app/lib/core/{config,di,error,network,router,theme,l10n}/**`, `apps/app/test/core/**`
   - done when: `flutter analyze` bersih dan `flutter test` lulus dengan test untuk setiap kriteria FR-11, termasuk penggantian host `10.0.2.2` di Android, pemetaan setiap `ErrorCode` ke teks Bahasa Indonesia, dan interceptor yang me-refresh token sekali saat `401`
 
-- [ ] T-014 Fitur login Flutter
+- [x] T-014 Fitur login Flutter
   - layer: app · depends_on: T-013 · refs: FR-12, NFR-06
   - files: `apps/app/lib/features/auth/{domain,data,presentation}/**`, `apps/app/lib/core/router/**`, `apps/app/test/features/auth/**`
   - done when: `flutter analyze` bersih; `flutter test` lulus dengan unit test use case, `bloc_test` untuk Cubit login, dan widget test redirect rute terlindungi; **(manual)** user memastikan daftar, login, pesan password salah, dan logout berjalan di Chrome dan Android emulator
