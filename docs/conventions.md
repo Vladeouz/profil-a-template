@@ -44,6 +44,8 @@ Library dipin ke versi pasti (tanpa `^` atau `~`) saat pertama dipasang, lalu di
 | `equatable` (Flutter) | 3.0.0 | T-013 |
 | `flutter_lints` (Flutter, dev) | 6.0.0 | T-004 (spike), T-013 |
 | `mocktail` (Flutter, dev) | 1.0.5 | T-013 |
+| `flutter_bloc` (Flutter) | 9.1.1 (`bloc` 9.2.1 transitif) | T-014 |
+| `bloc_test` (Flutter, dev) | 10.0.0 | T-014 |
 
 Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket Dart/Flutter: `flutter pub add <nama>:<versi>` (atau `flutter pub add <nama>` lalu hapus `^` di `pubspec.yaml`); `dio` di app sama persis dengan `packages/contract/dart`. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`. Build script yang tidak dibutuhkan didaftarkan dengan nilai `false` beserta alasannya di komentar (saat ini `@firebase/util` dan `protobufjs`, dependency `firebase-admin`); jangan biarkan nilai placeholder `set this to true or false` yang ditulis pnpm.
 
@@ -233,7 +235,7 @@ Aplikasi di `apps/app` (package `app`, platform web, Android, iOS), dibuat denga
 
 ```
 lib/
-├── main.dart                 # config → Firebase → useAuthEmulator → configureDependencies → runApp
+├── main.dart                 # config → Firebase → useAuthEmulator → tunggu authStateChanges().first → configureDependencies → runApp
 ├── app.dart                  # MaterialApp.router: tema, locale id, router
 └── core/
     ├── config/app_config.dart
@@ -243,6 +245,22 @@ lib/
     ├── network/              # create_dio.dart, auth_interceptor.dart, token_provider.dart, error_mapper.dart, api_call.dart
     ├── router/app_router.dart
     └── theme/app_theme.dart
+```
+
+Fitur di `lib/features/<fitur>/` (contoh lengkap: `features/auth/`):
+
+```
+features/auth/
+├── auth_dependencies.dart    # registerAuthDependencies(GetIt), dipanggil configureDependencies
+├── domain/
+│   ├── entities/             # auth_user.dart (Dart murni + equatable)
+│   ├── repositories/         # auth_repository.dart (abstract interface class)
+│   └── usecases/             # satu kelas per file, satu metode call: sign_in.dart, register.dart, sign_out.dart, watch_auth_user.dart
+├── data/                     # auth_mapper.dart (SDK/DTO → entity, exception → Failure), firebase_auth_repository.dart
+└── presentation/
+    ├── cubit/                # <nama>_cubit.dart + <nama>_state.dart (sealed)
+    ├── pages/                # satu halaman per rute
+    └── widgets/
 ```
 
 ### Config
@@ -275,15 +293,27 @@ lib/
 
 - get_it dengan registrasi manual. `configureDependencies({config, auth, container})` (`core/di/injection.dart`) mendaftarkan `AppConfig`, `FirebaseAuth`, `TokenProvider`, `Dio`, `ApiClient`, lalu memanggil `registerXxxDependencies(container)` setiap fitur. `FirebaseAuth` diberikan dari luar agar test memakai mock; test memakai `GetIt.asNewInstance()`.
 - `getIt` hanya dipanggil di composition root (`main.dart`, router, `registerXxxDependencies`); widget dan Cubit menerima dependency lewat konstruktor.
-- go_router: path di `AppRoutes`, rute di `createRouter()` (`core/router/app_router.dart`), rute tidak dikenal → `NotFoundPage`. `App` menerima `router` opsional untuk test.
+- go_router: path di `AppRoutes`, rute di `createRouter({container, initialLocation})` (`core/router/app_router.dart`), rute tidak dikenal → `NotFoundPage`. `App` menerima `router` opsional untuk test.
+- Registrasi: repository dan use case `registerLazySingleton`; Cubit halaman `registerFactory` dan dipasang router dengan `BlocProvider(create: (_) => c<LoginCubit>(), child: const LoginPage())`; Cubit sepanjang umur app (`AuthSessionCubit`) `registerLazySingleton` dengan `dispose`.
+
+### Autentikasi Flutter
+
+- Firebase Auth email/password lewat `AuthRepository` (`features/auth/domain/repositories/auth_repository.dart`); implementasi `FirebaseAuthRepository` memakai SDK Firebase langsung sebagai data source. `FirebaseAuthException.code` → `FailureCode` di `failureFromFirebaseAuth` (`features/auth/data/auth_mapper.dart`); `invalid-credential`/`wrong-password`/`user-not-found` sama-sama `invalidCredentials` (tidak membocorkan apakah akun ada).
+- `FailureCode` memuat kode Firebase Auth (`invalidCredentials`, `emailAlreadyInUse`, `weakPassword`, `invalidEmail`, `tooManyRequests`) di samping kode API, sehingga semua teks kegagalan tetap di `failure_messages.dart`.
+- Status login: `AuthSessionCubit` (sealed `Authenticated(user)` / `Unauthenticated`), state awal dari `currentUser`; `main.dart` menunggu `authStateChanges().first` sebelum `runApp` agar sesi tersimpan (web) sudah dipulihkan. Logout lewat `AuthSessionCubit.signOut()` (`SignOutButton`); state berubah lewat stream user, bukan langsung.
+- Rute terlindungi secara default: `redirect` di `createRouter` mengarahkan semua rute selain `AppRoutes.public` (`/login`, `/register`) ke login bila belum login, dan rute publik ke beranda bila sudah login. Dievaluasi ulang setiap `AuthSessionCubit` berubah (`refreshListenable`). Rute terlindungi ditaruh di `ShellRoute` yang memasang `AuthSessionCubit` (untuk `SignOutButton`). Halaman terlindungi memasang `SignOutButton` di `AppBar.actions`.
+- Form login dan daftar: `AuthForm` + `AuthFormState` (sealed `Idle`/`Submitting`/`Failed(failure)`/`Succeeded`). Validasi lokal hanya "wajib diisi"; aturan lain dari Firebase. Perpindahan halaman setelah berhasil dilakukan router, bukan halaman.
+- Cubit yang menunggu `Future` memeriksa `isClosed` sebelum `emit` dan mengabaikan submit kedua saat `Submitting` (`features/auth/presentation/cubit/login_cubit.dart`).
 
 ### Test Flutter
 
 - Test di `apps/app/test/` mengikuti struktur `lib/` (`lib/core/network/auth_interceptor.dart` → `test/core/network/auth_interceptor_test.dart`). Helper test yang bukan test tanpa akhiran `_test.dart` (contoh: `test/core/network/fake_http_adapter.dart`).
-- Mock dengan `mocktail` (`class MockFirebaseAuth extends Mock implements FirebaseAuth {}`); Cubit dengan `bloc_test` (mulai T-014).
+- Mock dengan `mocktail` (`class MockFirebaseAuth extends Mock implements FirebaseAuth {}`). Mock per fitur dikumpulkan di `test/features/<fitur>/mocks.dart` (`MockAuthRepository`, `MockLoginCubit extends MockCubit<AuthFormState> implements LoginCubit`).
+- Use case: satu file test per use case, repository di-mock (`test/features/auth/domain/usecases/sign_in_test.dart`). Cubit: `blocTest` (`test/features/auth/presentation/cubit/login_cubit_test.dart`). Halaman: widget test dengan Cubit mock + `whenListen` (`test/features/auth/presentation/pages/login_page_test.dart`).
+- Router: widget test dengan wiring fitur asli (`registerAuthDependencies` pada `GetIt.asNewInstance()`) dan repository diganti fake dalam memori (`test/features/auth/fake_auth_repository.dart`), lalu `App(router: createRouter(container: c))` (`test/core/router/app_router_test.dart`).
 - HTTP diuji lewat Dio sungguhan dengan `FakeHttpAdapter` (mencatat request, menjawab per request), bukan mock Dio. Contoh: `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`.
 - Test `config/dev.json` membaca file aslinya, jadi kunci yang hilang terdeteksi (`test/core/config/app_config_test.dart`).
 
 ## Belum diisi
 
-- Flutter: fitur auth (T-014) dan notes (T-015, T-016)
+- Flutter: fitur notes (T-015, T-016)

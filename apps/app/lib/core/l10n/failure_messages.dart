@@ -18,6 +18,13 @@ String failureMessage(FailureCode code) => switch (code) {
   FailureCode.network =>
     'Tidak dapat terhubung ke server. Periksa koneksi Anda.',
   FailureCode.unknown => genericFailureMessage,
+  FailureCode.invalidCredentials => 'Email atau password salah.',
+  FailureCode.emailAlreadyInUse => 'Email sudah terdaftar. Silakan masuk.',
+  FailureCode.weakPassword =>
+    'Password terlalu lemah. Gunakan minimal 6 karakter.',
+  FailureCode.invalidEmail => 'Format email tidak valid.',
+  FailureCode.tooManyRequests =>
+    'Terlalu banyak percobaan. Silakan coba lagi nanti.',
 };
 
 /// Teks Bahasa Indonesia untuk satu issue validasi field (kode issue Zod atau `required`).

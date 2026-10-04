@@ -41,6 +41,28 @@ void main() {
       expect(failureMessage(FailureCode.unknown), genericFailureMessage);
     });
 
+    test(
+      'setiap FailureCode selain unknown punya teks sendiri yang tidak kembar',
+      () {
+        final codes = FailureCode.values.where((c) => c != FailureCode.unknown);
+        final messages = codes.map(failureMessage).toList();
+
+        expect(messages, isNot(contains(genericFailureMessage)));
+        expect(messages.toSet(), hasLength(messages.length));
+      },
+    );
+
+    test('kegagalan Firebase Auth punya teks sendiri', () {
+      expect(
+        failureMessage(FailureCode.invalidCredentials),
+        'Email atau password salah.',
+      );
+      expect(
+        failureMessage(FailureCode.emailAlreadyInUse),
+        'Email sudah terdaftar. Silakan masuk.',
+      );
+    });
+
     test('kegagalan jaringan punya teks sendiri', () {
       expect(
         failureMessage(FailureCode.network),

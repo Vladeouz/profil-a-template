@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import 'package:app/core/config/app_config.dart';
 import 'package:app/core/network/create_dio.dart';
 import 'package:app/core/network/token_provider.dart';
+import 'package:app/features/auth/auth_dependencies.dart';
 
 /// Container dependency app. Widget dan Cubit mengambil dependency lewat konstruktor;
 /// `getIt` hanya dipanggil di composition root (`main.dart`, router, `registerXxxDependencies`).
@@ -30,4 +31,6 @@ void configureDependencies({
       () => createDio(baseUrl: config.apiBaseUrl, tokens: c()),
     )
     ..registerLazySingleton<ApiClient>(() => ApiClient(c()));
+
+  registerAuthDependencies(c);
 }

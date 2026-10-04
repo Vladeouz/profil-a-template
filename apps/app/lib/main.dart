@@ -22,6 +22,10 @@ Future<void> main() async {
     );
   }
 
+  // Tunggu sesi tersimpan dipulihkan (web), agar status login awal router benar
+  // dan user yang sudah login tidak sempat diarahkan ke halaman login.
+  await auth.authStateChanges().first;
+
   configureDependencies(config: config, auth: auth);
   runApp(const App());
 }

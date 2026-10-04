@@ -9,6 +9,11 @@ import 'package:app/core/config/app_config.dart';
 import 'package:app/core/di/injection.dart';
 import 'package:app/core/network/auth_interceptor.dart';
 import 'package:app/core/network/token_provider.dart';
+import 'package:app/features/auth/data/firebase_auth_repository.dart';
+import 'package:app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:app/features/auth/presentation/cubit/auth_session_cubit.dart';
+import 'package:app/features/auth/presentation/cubit/login_cubit.dart';
+import 'package:app/features/auth/presentation/cubit/register_cubit.dart';
 
 class MockFirebaseAuth extends Mock implements FirebaseAuth {}
 
@@ -51,6 +56,16 @@ void main() {
   test('ApiClient dan Dio adalah singleton', () {
     expect(container<ApiClient>(), same(container<ApiClient>()));
     expect(container<Dio>(), same(container<Dio>()));
+  });
+
+  test('mendaftarkan dependency fitur auth', () {
+    when(() => auth.currentUser).thenReturn(null);
+    when(() => auth.authStateChanges()).thenAnswer((_) => const Stream.empty());
+
+    expect(container<AuthRepository>(), isA<FirebaseAuthRepository>());
+    expect(container<AuthSessionCubit>(), same(container<AuthSessionCubit>()));
+    expect(container<LoginCubit>(), isNot(same(container<LoginCubit>())));
+    expect(container<RegisterCubit>(), isNot(same(container<RegisterCubit>())));
   });
 
   test('memakai GetIt.instance bila container tidak diberikan', () async {

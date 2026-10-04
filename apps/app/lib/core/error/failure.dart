@@ -18,6 +18,15 @@ enum FailureCode {
 
   /// Kode yang belum dikenal app, atau respons yang tidak bisa dibaca.
   unknown,
+
+  // Firebase Auth (fitur auth), bukan dari API.
+
+  /// Email atau password salah, atau akun tidak ada.
+  invalidCredentials,
+  emailAlreadyInUse,
+  weakPassword,
+  invalidEmail,
+  tooManyRequests,
 }
 
 /// Kegagalan yang dibawa `Err`. Kelas Dart murni, tanpa dio atau DTO, agar bisa dipakai domain.
