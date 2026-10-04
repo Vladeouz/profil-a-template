@@ -28,6 +28,7 @@ Library dipin ke versi pasti (tanpa `^` atau `~`) saat pertama dipasang, lalu di
 | `pg` | 8.23.0 | T-006 |
 | `@types/pg` | 8.23.1 | T-006 |
 | `firebase-admin` | 14.5.0 | T-007 |
+| `pg-boss` | 12.36.0 | T-009 |
 
 Pasang dengan `pnpm --filter <paket> add -E <nama>` agar versi langsung pasti. Paket yang butuh build script saat install didaftarkan di `allowBuilds` pada `pnpm-workspace.yaml` (saat ini `esbuild`, dipakai `tsx` dan `vitest`); tanpa itu pnpm 12 keluar dengan `ERR_PNPM_IGNORED_BUILDS`. Build script yang tidak dibutuhkan didaftarkan dengan nilai `false` beserta alasannya di komentar (saat ini `@firebase/util` dan `protobufjs`, dependency `firebase-admin`); jangan biarkan nilai placeholder `set this to true or false` yang ditulis pnpm.
 
@@ -76,6 +77,7 @@ Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan
 - Setiap variabel baru ditambahkan bersamaan ke skema `env.ts`, `.env.example`, dan `test/setup/env.ts` (default untuk test).
 - `pnpm --filter api dev` dan `start` membaca `../../.env` lewat `--env-file-if-exists`; variabel yang sudah di-set di shell menang.
 - `FIREBASE_PROJECT_ID` wajib. `FIREBASE_AUTH_EMULATOR_HOST` (`host:port`) opsional; bila di-set, firebase-admin memverifikasi token ke Auth Emulator. Ditolak bila `NODE_ENV=production`.
+- `RUN_WORKER` opsional, hanya `true` atau `false` (tidak di-set = `false`). Lihat bagian Job.
 - `CORS_ORIGINS` wajib, daftar origin dipisah koma (misalnya `http://localhost:8081` untuk Flutter web). Origin lain tidak mendapat `Access-Control-Allow-Origin`. Lihat `apps/api/src/core/http/cors.ts`.
 
 ### Logger
@@ -83,6 +85,27 @@ Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan
 - pino, JSON ke stdout (`apps/api/src/core/logger.ts`). Di handler pakai `c.var.log` (child logger dengan `requestId`).
 - Field `authorization`/`Authorization`, `token`, `idToken`, `email`, `phone` diredaksi menjadi `[REDACTED]` sampai kedalaman 4. Field sensitif baru ditambahkan ke `SENSITIVE_KEYS` beserta test-nya.
 - Log request hanya berisi method, path (tanpa query string), status, durasi, dan `requestId`. Header tidak pernah dicatat.
+
+## Job (pg-boss)
+
+D-05: pg-boss berjalan di proses API, hanya bila `RUN_WORKER=true`. Implementasi di `apps/api/src/core/jobs/boss.ts`, contoh job di `apps/api/src/core/jobs/heartbeat.job.ts`.
+
+- Satu job adalah `JobDefinition` (`name`, `handler`, `cron` opsional) yang dibuat fungsi `xxxJob(deps)` di file `<nama>.job.ts`, lalu didaftarkan di array `jobs` pada `startBoss()` di `src/server.ts`. Job milik fitur ditaruh di `features/<fitur>/jobs/`; `core/jobs` hanya untuk job sistem.
+- Nama queue `<area>.<aksi>` (`system.heartbeat`). Jadwal cron 5 field, zona UTC (`*/5 * * * *`).
+- `startBoss()` mengembalikan `null` tanpa membuka koneksi bila `runWorker` false. Bila true: start, lalu untuk setiap job `createQueue`, `schedule` (bila ada `cron`), dan `work`. Gagal di tengah jalan menghentikan pg-boss lalu melempar ulang error; `server.ts` keluar dengan exit code 1.
+- pg-boss memakai pool sendiri dari `DATABASE_URL` dan schema `pgboss` (dibuat pg-boss, bukan migrasi Drizzle). Listener `error` selalu dipasang dan menulis ke log.
+- Handler menerima array job (`Job<T>[]`) dan memakai logger yang diteruskan ke fungsi job, dengan field `job` dan `jobId`.
+
+### Shutdown
+
+`createShutdown()` di `apps/api/src/core/shutdown.ts`, dipasang untuk `SIGINT` dan `SIGTERM` di `src/server.ts`. Urutan:
+
+1. `server.close()`: tolak koneksi baru dan tunggu request yang sedang berjalan. Koneksi keep-alive yang idle ditutup setiap 100 ms; tanpa itu Node menunggu `keepAliveTimeout` (beberapa detik).
+2. `boss.stop({ graceful: true })`: tunggu job yang sedang berjalan.
+3. Tutup koneksi lain di `closers` (pool database, firebase-admin). Koneksi baru yang perlu ditutup saat shutdown ditambahkan di sini.
+4. `exit(0)`; bila ada langkah yang gagal, error dicatat, langkah berikutnya tetap jalan, dan exit code 1. Sinyal kedua tidak memulai shutdown baru.
+
+Test: `test/int/jobs/boss.int.test.ts` (start, jadwal, job diproses, `RUN_WORKER` mati), `test/int/jobs/shutdown.int.test.ts` (urutan dengan server HTTP dan pg-boss sungguhan, fungsi shutdown dipanggil langsung tanpa sinyal). Koneksi pg-boss di `pg_stat_activity` memakai `application_name` `pgboss:<id>`.
 
 ## Autentikasi
 

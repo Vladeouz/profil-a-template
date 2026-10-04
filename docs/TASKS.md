@@ -46,7 +46,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/api/src/core/http/pagination.ts`, `apps/api/test/unit/core/http/pagination.test.ts`
   - done when: unit test membuktikan encode/decode cursor bolak-balik, `limit` default 20 dan batas 1–100, cursor rusak menghasilkan `422` dengan `details.cursor`, dan skema query serta respons `{ items, nextCursor }` bisa dipakai ulang oleh route mana pun
 
-- [ ] T-009 pg-boss: lifecycle, graceful shutdown, job `system.heartbeat`
+- [x] T-009 pg-boss: lifecycle, graceful shutdown, job `system.heartbeat`
   - layer: api · depends_on: T-006 · refs: FR-07, D-05
   - files: `apps/api/src/core/jobs/{boss,heartbeat.job}.ts`, `apps/api/src/server.ts`, `apps/api/test/int/jobs/**`
   - done when: `pnpm --filter api test:int` membuktikan job dikirim lalu diproses handler, pg-boss tidak start tanpa `RUN_WORKER=true`, dan urutan shutdown (berhenti menerima request, stop pg-boss, keluar) teruji lewat fungsi shutdown yang dipanggil langsung di test

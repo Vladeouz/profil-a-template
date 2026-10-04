@@ -8,6 +8,8 @@ const defaults: Record<string, string> = {
   // Auth Emulator lokal (docker compose). Integration test membuat token lewat test/helpers/emulator-token.ts.
   FIREBASE_PROJECT_ID: 'demo-template',
   FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
+  // pg-boss dijalankan langsung oleh test/int/jobs lewat startBoss(), bukan lewat env.
+  RUN_WORKER: 'false',
 };
 
 for (const [key, value] of Object.entries(defaults)) {

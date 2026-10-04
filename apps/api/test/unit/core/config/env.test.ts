@@ -17,7 +17,18 @@ describe('loadEnv', () => {
       CORS_ORIGINS: ['http://localhost:8081'],
       DATABASE_URL,
       FIREBASE_PROJECT_ID: 'demo-template',
+      RUN_WORKER: false,
     });
+  });
+
+  it('parses RUN_WORKER as a boolean, false when unset', () => {
+    expect(loadEnv(base).RUN_WORKER).toBe(false);
+    expect(loadEnv({ ...base, RUN_WORKER: 'true' }).RUN_WORKER).toBe(true);
+    expect(loadEnv({ ...base, RUN_WORKER: 'false' }).RUN_WORKER).toBe(false);
+  });
+
+  it.each(['1', 'yes', 'TRUE', ''])('rejects RUN_WORKER=%j', (value) => {
+    expect(() => loadEnv({ ...base, RUN_WORKER: value })).toThrow(/RUN_WORKER/);
   });
 
   it('coerces PORT from a string', () => {

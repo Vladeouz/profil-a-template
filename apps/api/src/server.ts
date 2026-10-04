@@ -2,7 +2,10 @@ import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { createFirebaseAdmin, createFirebaseTokenVerifier } from './core/auth/firebase-admin.js';
 import { type Env, EnvError, loadEnv } from './core/config/env.js';
+import { startBoss } from './core/jobs/boss.js';
+import { heartbeatJob } from './core/jobs/heartbeat.job.js';
 import { createLogger } from './core/logger.js';
+import { createShutdown } from './core/shutdown.js';
 import { createDb } from './db/client.js';
 
 function readEnv(): Env {
@@ -29,25 +32,39 @@ const app = createApp({
   tokenVerifier: createFirebaseTokenVerifier(firebase.auth),
 });
 
+let boss: Awaited<ReturnType<typeof startBoss>>;
+try {
+  boss = await startBoss({
+    databaseUrl: env.DATABASE_URL,
+    runWorker: env.RUN_WORKER,
+    logger,
+    jobs: [heartbeatJob(logger)],
+  });
+} catch (err) {
+  logger.fatal({ err }, 'failed to start pg-boss');
+  await Promise.allSettled([database.close(), firebase.close()]);
+  process.exit(1);
+}
+
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info(
     {
       port: info.port,
       nodeEnv: env.NODE_ENV,
       authEmulator: env.FIREBASE_AUTH_EMULATOR_HOST ?? null,
+      worker: boss !== null,
     },
     'API listening',
   );
 });
 
-function shutdown(signal: NodeJS.Signals): void {
-  logger.info({ signal }, 'shutting down');
-  server.close(async (err) => {
-    if (err) logger.error({ err }, 'failed to close server');
-    await Promise.allSettled([database.close(), firebase.close()]);
-    process.exit(err ? 1 : 0);
-  });
-}
+const shutdown = createShutdown({
+  logger,
+  server,
+  boss,
+  closers: [database.close, firebase.close],
+  exit: (code) => process.exit(code),
+});
 
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);

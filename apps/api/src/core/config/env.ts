@@ -26,6 +26,11 @@ const EnvObject = z.object({
   DATABASE_URL: DatabaseUrl,
   FIREBASE_PROJECT_ID: z.string().min(1),
   FIREBASE_AUTH_EMULATOR_HOST: EmulatorHost.optional(),
+  // D-05: pg-boss hanya berjalan bila `true`; tidak di-set berarti `false`.
+  RUN_WORKER: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 
 // Dengan emulator, firebase-admin menerima token tanpa tanda tangan; jangan pernah di produksi.
