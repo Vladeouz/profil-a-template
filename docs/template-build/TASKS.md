@@ -135,3 +135,9 @@ Sumber: log T-001 sampai T-007 di repo `daftar-belanja` (`D:\dev\daftar-belanja\
   - layer: infra, docs · depends_on: T-023 · refs: FR-01, FR-16
   - files: `scripts/init-project.mjs`, `README.md`, `docs/conventions.md`, `CLAUDE.md`
   - done when: output akhir `pnpm init-project` mencantumkan urutan langkah yang wajib, termasuk menyalin `.env`, `pnpm prereq`, `docker compose up -d --wait`, `pnpm check`, dan commit hasil inisialisasi sebelum sesi agent pertama; README memuat urutan yang sama; `docs/conventions.md` mewajibkan langkah verifikasi manual di setiap log menyebut persiapan `.env` dan perintah Flutter web dengan flag incognito; diuji pada salinan baru yang dibuat dengan `git clone` dari repo GitHub, `pnpm init-project uji-kedua`, lalu mengikuti output script sampai `pnpm check` hijau dan `pnpm prereq` melaporkan semua prasyarat OK
+## Fase 6 — Perbaikan lanjutan
+
+- [ ] T-025 `updated_at` memakai jam database
+  - layer: db, api · depends_on: T-024 · refs: FR-05, FR-09
+  - files: `apps/api/src/db/schema/columns.ts`, `apps/api/test/int/db/schema.int.test.ts`, `apps/api/test/int/notes/notes-schema.int.test.ts`, `docs/conventions.md`
+  - done when: `updatedAt()` di `columns.ts` mengisi nilai saat `update()` dengan `now()` database, bukan `new Date()` host, sehingga `created_at` dan `updated_at` selalu berasal dari jam yang sama (sumber masalah: test `notes-schema.int.test.ts` › updated_at gagal acak karena selisih jam VM Docker dan host, log T-024); integration test membuktikan `updated_at` hasil `update()` Drizzle di dalam transaksi sama persis dengan `select now()` di transaksi yang sama, dan test itu terbukti merah bila `$onUpdate` dikembalikan ke `new Date()`; `db:generate` ulang tidak menghasilkan migrasi; `pnpm --filter api test:int` lulus 10 kali berturut-turut; `docs/conventions.md` bagian Database menyebut aturan ini; `pnpm check` hijau
