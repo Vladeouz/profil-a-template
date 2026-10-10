@@ -24,6 +24,8 @@ Fitur `notes` di API dan Flutter adalah contoh pola lengkap dari database sampai
 | Android SDK + emulator | tidak | hanya untuk verifikasi Android |
 | File `.env` | ya | salin sendiri dari `.env.example` |
 
+**Platform iOS** disertakan di `apps/app/ios`, tetapi belum pernah di-build atau diverifikasi karena template dikembangkan di Windows (build iOS butuh macOS dan Xcode). Verifikasi web dan Android sudah dilakukan. Untuk memverifikasi iOS tanpa Mac, tambahkan job CI di runner macOS GitHub Actions (misalnya `runs-on: macos-15`) yang menjalankan `flutter build ios --simulator --dart-define-from-file=config/dev.json` di `apps/app` (lihat bagian "Flutter" di `docs/conventions.md`).
+
 ## Memulai proyek baru dari template
 
 Buat salinan repo (misalnya repo baru dari template ini di GitHub, lalu clone), kemudian dari root salinan itu:

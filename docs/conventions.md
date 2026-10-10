@@ -96,6 +96,7 @@ pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila 
 - Langkah verifikasi baru (tool baru, paket baru) ditambahkan ke `STEPS` di `scripts/check.mjs`, bukan ke `ci.yml`.
 - CI (`.github/workflows/ci.yml`) hanya menjalankan `pnpm check` pada setiap push dan pull request, dengan PostgreSQL sebagai `services` dan emulator Firebase lewat `docker compose` (image di-build dengan cache GitHub Actions). Env tidak di-set di CI: default di `apps/api/test/setup/env.ts` sudah menunjuk layanan itu. Bila gagal, output langkahnya ada di artifact `check-logs`.
 - Versi Flutter di `ci.yml` diperbarui bersamaan dengan README dan tabel versi di atas. Action dipin ke major tag.
+- Runner dipin ke versi image (`runs-on: ubuntu-24.04`), bukan `ubuntu-latest`. Label `latest` dipindah GitHub ke versi Ubuntu baru tanpa perubahan di repo, sehingga versi Docker, Git, dan library sistem bisa berubah diam-diam dan CI gagal tanpa ada commit yang menjelaskannya. Naikkan versi runner secara sengaja dalam commit tersendiri, lalu pastikan `pnpm check` tetap hijau.
 
 ## Layanan lokal
 
@@ -334,6 +335,8 @@ D-01, D-02: route Hono adalah satu-satunya sumber kebenaran. `packages/contract/
 ## Flutter
 
 Aplikasi di `apps/app` (package `app`, platform web, Android, iOS), dibuat dengan `flutter create --empty`. Lint `flutter_lints` + `strict-casts`, `strict-inference`, `strict-raw-types`, `always_use_package_imports`, `prefer_single_quotes` (`analysis_options.yaml`); format dengan `dart format` (lebar bawaan 80). `flutter analyze` dan `flutter test` dijalankan di `apps/app`.
+
+- **iOS belum terverifikasi.** Folder `apps/app/ios` disertakan, tetapi belum pernah di-build atau dijalankan karena template dikembangkan di Windows (build iOS butuh macOS dan Xcode); yang sudah diverifikasi hanya web dan Android. Opsi verifikasi tanpa Mac: job CI terpisah di runner macOS GitHub Actions (misalnya `runs-on: macos-15`, versi Flutter sama dengan job `check`) yang menjalankan `flutter build ios --simulator --dart-define-from-file=config/dev.json` di `apps/app`. Build simulator tidak butuh signing; menit runner macOS dihitung lebih mahal daripada Linux, jadi jalankan hanya pada pull request ke `master` atau lewat `workflow_dispatch`. Proyek yang menargetkan iOS mencatat hasil verifikasi pertamanya di sini.
 
 ```
 lib/

@@ -386,3 +386,9 @@ Acceptance criteria:
 ### Open Questions
 
 - Tidak ada. Keputusan yang sebelumnya terbuka sudah diputuskan di atas; hasil spike di T-001 sampai T-004 bisa mengubah D-02, D-04, atau D-08, dan perubahan itu dicatat di log serta di tabel ini.
+
+## Catatan koreksi
+
+Ditambahkan setelah template selesai (setelah T-021). Isi asli di atas tidak diubah agar riwayat keputusan tetap utuh.
+
+- **Bagian 3, Pohon folder:** baris `package.json` menyebut script root `dev`. Script itu tidak pernah dibuat (diputuskan di T-020). Script root yang ada: `prereq`, `check`, `lint`, `format`, `contract:generate`, `contract:check`, `init-project`; API dan Flutter dijalankan per paket dengan `pnpm --filter <paket> <script>` (misalnya `pnpm --filter api dev`). Baris `scripts/` juga kurang `contract.mjs`. Pohon yang berlaku ada di `docs/conventions.md`, bagian "Struktur repo".
