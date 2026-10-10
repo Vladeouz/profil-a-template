@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
 
+import 'package:app/core/error/failure.dart';
 import 'package:app/core/l10n/failure_messages.dart';
-import 'package:app/features/notes/presentation/cubit/notes_list_state.dart';
 
 /// Baris terakhir daftar selama masih ada halaman berikutnya.
 ///
 /// `ListView.builder` baru membangun baris ini saat digulir mendekati bawah, jadi
 /// [onLoadMore] dipanggil tepat saat itu (juga bila halaman pertama tidak memenuhi layar).
-/// Bila gagal, tampil pesan dan tombol "Coba lagi"; tidak dicoba ulang otomatis.
+/// Bila gagal ([failure] tidak `null`), tampil pesan dan tombol "Coba lagi"; tidak
+/// dicoba ulang otomatis. Selama [loadingMore], [onLoadMore] tidak dipanggil lagi.
 class LoadMoreFooter extends StatelessWidget {
   const LoadMoreFooter({
     super.key,
-    required this.state,
+    required this.loadingMore,
+    required this.failure,
     required this.onLoadMore,
   });
 
-  final NotesListLoaded state;
+  final bool loadingMore;
+  final Failure? failure;
   final VoidCallback onLoadMore;
 
   @override
   Widget build(BuildContext context) {
-    final failure = state.loadMoreFailure;
+    final failure = this.failure;
     if (failure != null) {
       return Padding(
         padding: const EdgeInsets.all(16),
@@ -36,7 +39,7 @@ class LoadMoreFooter extends StatelessWidget {
       padding: EdgeInsets.all(16),
       child: Center(child: CircularProgressIndicator()),
     );
-    return state.loadingMore
+    return loadingMore
         ? spinner
         : _OnFirstBuild(callback: onLoadMore, child: spinner);
   }

@@ -292,6 +292,48 @@ features/<fitur>/
 - Route: path param `id` divalidasi `z.uuid()` (bukan UUID → `422 details.id`); body POST/PATCH memakai `request.body.required: true`; PATCH memakai skema dengan semua field opsional + `.refine()` minimal satu field (→ `details._root`); `DELETE` mengembalikan `c.body(null, 204)`. Skema request dan respons diberi nama `.openapi('Note')`, `'CreateNoteInput'`, `'UpdateNoteInput'`, `'NotePage'`.
 - Teks wajib yang tidak boleh kosong memakai `.trim()` sebelum `.min()`/`.max()` (`z.string().trim().min(1).max(TITLE_MAX)`): teks berisi spasi saja → `422` `too_small`, nilai yang disimpan sudah dirapikan, dan panjang dihitung setelah dirapikan. Contoh: `Title` di `features/notes/http/notes.route.ts`, dijaga `test/int/notes/notes.int.test.ts`.
 
+### Pola lanjutan API (belum ada file contoh di template)
+
+Ditemukan saat fitur proyek pertama dibangun dari template; fitur notes tidak memakainya. Proyek yang pertama memakai pola ini mencatat filenya di sini sebagai file contoh.
+
+- **Pelanggaran keunikan → `409 CONFLICT`.** Keunikan ditegakkan constraint database bernama (`<tabel>_<kolom>_unique`, misalnya unique index `(user_id, lower(name))` untuk nama unik per user tanpa membedakan huruf besar-kecil), bukan cek "ambil dulu lalu insert" yang rawan balapan. Repository menangkap SQLSTATE `23505` dengan nama constraint itu dan melempar error domain yang didefinisikan di `domain/<entity>.ts`; use case mengubahnya menjadi `AppError('CONFLICT', …)`. Repository tidak mengimpor `AppError`, dan use case tidak mengenal kode PostgreSQL. Error lain dilempar ulang apa adanya. Interface repository di `domain/` menyebut error itu di komentar metodenya.
+
+  ```ts
+  // domain/<entity>.ts
+  export class ItemNameTakenError extends Error {
+    constructor() {
+      super('Item name already exists');
+      this.name = 'ItemNameTakenError';
+    }
+  }
+
+  // infrastructure/drizzle-<entity>-repository.ts: bungkus insert dan update.
+  // Drizzle membungkus error `pg` di `cause`.
+  async function mapNameTaken<T>(query: PromiseLike<T>): Promise<T> {
+    try {
+      return await query;
+    } catch (error) {
+      const pg = (error as { cause?: unknown }).cause ?? error;
+      const { code, constraint } = pg as { code?: string; constraint?: string };
+      if (code === '23505' && constraint === 'items_user_id_name_unique') {
+        throw new ItemNameTakenError();
+      }
+      throw error;
+    }
+  }
+
+  // usecases/create-<entity>.ts
+  try {
+    return await items.create(input);
+  } catch (error) {
+    if (error instanceof ItemNameTakenError) throw new AppError('CONFLICT', 'Item name already exists');
+    throw error;
+  }
+  ```
+
+  Test: unit test use case dengan repository palsu yang melempar error domain yang sama; integration test untuk tambah dan ubah dengan nama yang sudah ada → `409`, termasuk beda huruf besar-kecil bila berlaku. Di Flutter, `CONFLICT` sampai sebagai `FailureCode.conflict` (lihat Teks kegagalan khusus fitur di field).
+- **Endpoint aksi non-CRUD** (aksi atas banyak resource sekaligus, misalnya "hapus semua yang selesai"): `POST /v1/<resource>/<aksi>` dengan aksi kebab-case, `operationId` kata kerja camelCase (`clearDoneItems`). Respons skema bernama `<Operasi>Result` dengan huruf pertama kapital (`.openapi('ClearDoneItemsResult')`, berisi misalnya `{ deletedCount }`), sehingga kelas Dart-nya bernama sama. Aksi yang tidak menemukan apa pun tetap `200` (idempoten, `deletedCount: 0`), bukan `404`. Route tanpa body dan tanpa param hanya mendokumentasikan `401`. Repository menjalankan aksi dalam satu query yang dibatasi pemilik (`DELETE … WHERE user_id = $1 AND … RETURNING id`).
+
 ### Aturan bisnis: API vs client
 
 - Aturan bisnis (wajib diisi, batas panjang, keunikan, hak akses, minimal satu field) ditegakkan di API: skema Zod route, use case, dan constraint database. API adalah satu-satunya sumber kebenaran dan harus aman walau client mengirim input apa pun.
@@ -349,8 +391,11 @@ lib/
     ├── l10n/                 # app_locale.dart, failure_messages.dart
     ├── network/              # create_dio.dart, auth_interceptor.dart, token_provider.dart, error_mapper.dart, api_call.dart
     ├── router/app_router.dart
-    └── theme/app_theme.dart
+    ├── theme/app_theme.dart
+    └── widgets/              # failure_view.dart, load_more_footer.dart (dipakai lebih dari satu fitur)
 ```
+
+Widget yang dipakai lebih dari satu fitur ditaruh di `lib/core/widgets/`, tanpa mengimpor fitur mana pun (menerima nilai biasa seperti `Failure` dan `bool`, bukan state Cubit fitur). Fitur tidak mengimpor widget fitur lain; bila widget fitur dibutuhkan fitur kedua, pindahkan ke `core/widgets/` (beserta test-nya di `test/core/widgets/`) dalam task yang sama, bukan disalin.
 
 Arah dependency (Clean Architecture): `presentation` (widget + Cubit) → `domain` ← `data`. `domain` berisi Dart murni: tidak mengimpor Flutter, dio, firebase, atau `api_client`. State Cubit adalah sealed class Dart 3. Teks UI Bahasa Indonesia.
 
@@ -394,7 +439,7 @@ features/auth/
 ### Teks UI dan l10n
 
 - Teks UI Bahasa Indonesia ditulis langsung di widget (satu bahasa, tanpa ARB). `AppLocale` (`core/l10n/app_locale.dart`) memasang locale `id` dan delegate Material/Cupertino agar teks bawaan widget juga Bahasa Indonesia.
-- D-03: teks kegagalan untuk user hanya dari `failureMessage(FailureCode)` dan `fieldIssueMessage(FieldIssue)` di `core/l10n/failure_messages.dart`, dengan `genericFailureMessage` sebagai cadangan. `Failure.message` dari server tidak pernah ditampilkan.
+- D-03: teks kegagalan untuk user hanya dari `failureMessage(FailureCode)` dan `fieldIssueMessage(FieldIssue)` di `core/l10n/failure_messages.dart`, dengan `genericFailureMessage` sebagai cadangan. `Failure.message` dari server tidak pernah ditampilkan. Satu-satunya pengecualian adalah teks yang bergantung pada konteks fitur di field form, yang tetap dipilih dari `failure.code` (lihat Teks kegagalan khusus fitur di field).
 
 ### DI dan router
 
@@ -430,7 +475,7 @@ features/notes/
 └── presentation/
     ├── cubit/                        # notes_list_cubit (daftar + pagination), note_form_cubit (buat/ubah/hapus)
     ├── pages/                        # notes_page.dart (/notes), note_form_page.dart (/notes/new, /notes/:id)
-    └── widgets/                      # note_tile, note_form, load_more_footer, failure_view
+    └── widgets/                      # note_tile, note_form (FailureView, LoadMoreFooter dari core/widgets)
 ```
 
 - Data source satu kelas per resource di atas client hasil generate (`c<ApiClient>().notes`): menerima parameter Dart biasa, membuat DTO input (`CreateNoteInput`, `UpdateNoteInput`), dan mengembalikan DTO respons. Tidak menangkap exception.
@@ -443,13 +488,69 @@ features/notes/
 Presentation (`features/notes/presentation/`):
 
 - **Daftar dengan pagination** (`NotesListCubit`): state sealed `Loading` / `LoadFailed(failure)` / `Loaded(items, nextCursor, loadingMore, loadMoreFailure)`. `load()` memuat halaman pertama (juga untuk "Coba lagi"); `loadMore()` memakai `nextCursor` dan diabaikan bila sudah halaman terakhir atau sedang memuat. Gagal di halaman berikutnya tidak menghapus daftar: `loadMoreFailure` tampil di baris terakhir dengan tombol "Coba lagi", tanpa coba ulang otomatis. Setelah `await`, Cubit membaca `state` lagi karena daftar bisa berubah selama menunggu.
-- **Muat saat digulir:** baris terakhir `ListView.builder` (`LoadMoreFooter`) memanggil `loadMore()` setelah frame pertama ia dibangun. `ListView.builder` baru membangunnya saat digulir mendekati bawah, jadi tidak perlu `ScrollController`, dan halaman pertama yang tidak memenuhi layar langsung memuat halaman berikutnya. Jangan memanggil Cubit langsung di `build`.
-- **Gagal memuat halaman** (jaringan, `NOT_FOUND`): `FailureView` menampilkan `failureMessage(code)` dan tombol "Coba lagi".
-- **Form** (`NoteFormCubit`): state sealed `Loading` / `LoadFailed` / `Editing(note?, status, failure)` / `Saved(note)` / `Deleted(id)`; `note` `null` = membuat baru. Error validasi API (`failure.fieldErrors['title']`) tampil sebagai `errorText` di field-nya lewat `fieldIssueMessage`; kegagalan yang tidak punya field (jaringan, `NOT_FOUND`, `_root`) tampil di atas tombol simpan. Validasi lokal hanya "wajib diisi" dan `maxLength` sama dengan API. Hapus selalu lewat dialog konfirmasi.
+- **Muat saat digulir:** baris terakhir `ListView.builder` (`LoadMoreFooter` di `core/widgets/load_more_footer.dart`, diberi `loadingMore` dan `failure` dari state `Loaded`) memanggil `loadMore()` setelah frame pertama ia dibangun. `ListView.builder` baru membangunnya saat digulir mendekati bawah, jadi tidak perlu `ScrollController`, dan halaman pertama yang tidak memenuhi layar langsung memuat halaman berikutnya. Jangan memanggil Cubit langsung di `build`.
+- **Gagal memuat halaman** (jaringan, `NOT_FOUND`): `FailureView` (`core/widgets/failure_view.dart`) menampilkan `failureMessage(code)` dan tombol "Coba lagi".
+- **Form** (`NoteFormCubit`): state sealed `Loading` / `LoadFailed` / `Editing(note?, status, failure)` / `Saved(note)` / `Deleted(id)`; `note` `null` = membuat baru. Error validasi API (`failure.fieldErrors['title']`) tampil sebagai `errorText` di field-nya lewat `fieldIssueMessage`; kegagalan yang tidak punya field (jaringan, `NOT_FOUND`, `_root`) tampil di atas tombol simpan. Validasi lokal hanya "wajib diisi" dan `maxLength` sama dengan API. Hapus selalu lewat dialog konfirmasi. Fitur tanpa `GET` per item memakai varian tanpa `Loading`/`LoadFailed` (lihat Pola lanjutan presentation).
 - **Navigasi form ↔ daftar:** daftar membuka form dengan `context.push<NoteFormState>(AppRoutes.note(id), extra: note)`; form menutup dirinya dengan `context.pop(NoteFormSaved/NoteFormDeleted)`, lalu daftar menerapkan hasilnya (`noteSaved`, `noteDeleted`) tanpa memuat ulang dari API. Rute ubah membaca note dari `extra`; bila kosong (URL dibuka langsung atau dimuat ulang di web), router memanggil `cubit.load(id)` sehingga note diambil lewat `GetNote`.
 - **Kembali ke daftar tanpa hasil → muat ulang halaman pertama.** Ada dua jalur, keduanya di `NotesPage` (`features/notes/presentation/pages/notes_page.dart`): (1) `push` dari daftar selesai tanpa state (tombol kembali, tombol kembali browser) → `cubit.load()`; (2) form dibuka lewat URL (`/notes/<id>`, `/notes/new`) sehingga daftar di bawahnya tidak memanggil `push` dan hasil `context.pop(state)` tidak sampai ke mana pun. Untuk jalur kedua, halaman daftar memantau `ModalRoute.isCurrentOf(context)` di `didChangeDependencies`: saat rutenya kembali paling atas dan form tidak dibuka lewat `_openForm`, daftar memanggil `cubit.load()`. Flag `_openedHere` mencegah muat ganda saat form dibuka dari daftar (jalur pertama sudah menanganinya). Dijaga `notes_flow_test.dart` › kembali dari form tanpa hasil, dan › dibuka lewat URL › `/notes/<id>`, simpan, kembali. Fitur lain dengan pola daftar ↔ form memakai pola yang sama.
 - **Rute anak:** halaman form adalah rute anak (`new`, `:id`) dari rute daftar di dalam `ShellRoute` terlindungi, sehingga membuka URL form langsung tetap menaruh daftar di bawahnya. `new` didaftarkan sebelum `:id`. `GoRouter.optionURLReflectsImperativeAPIs = true` (di `createRouter`) agar `push` ikut mengubah URL di web.
 - **Waktu:** `updatedAt.toLocal()` diformat dengan `MaterialLocalizations.formatMediumDate` (locale `id`), tanpa package `intl`.
+
+### Pola lanjutan presentation (belum ada file contoh di template)
+
+Ditemukan saat fitur proyek pertama dibangun dari template; fitur notes tidak memakainya. Proyek yang pertama memakai pola ini mencatat filenya di sini sebagai file contoh, menggantikan potongan kode di bawah.
+
+- **Daftar berpagination dengan filter** (pasangan API: `PaginationQuerySchema.extend({ status: … })`, lihat Pagination). Filter adalah enum domain sendiri (`domain/entities/`), bukan enum kontrak; `data/` memetakannya ke enum DTO dengan switch tanpa `default`, dan filter `null` = tidak dikirim (bawaan API). Di Cubit:
+  - Filter disimpan di state dan dibawa **setiap** state (`Loading(filter)`, `LoadFailed(filter, failure)`, `Loaded(filter, …)`), agar pilihan filter tetap tampil saat memuat atau gagal.
+  - `setFilter(filter)` diabaikan bila filter sama; selain itu memuat ulang halaman pertama.
+  - Hasil permintaan lama dibuang lewat penghitung generasi: setiap muat ulang halaman pertama menaikkan `_generation`; setiap `await` (halaman pertama, `loadMore`, aksi) menyimpan nilainya sebelum menunggu dan membuang hasilnya bila sudah berubah. Tanpa ini, jawaban filter lama yang datang belakangan menimpa daftar filter baru, atau halaman berikutnya filter lama tersambung ke daftar filter baru.
+  - Item yang tidak lagi cocok dengan filter setelah diubah (lewat form atau aksi di daftar) dibuang dari daftar.
+
+  ```dart
+  int _generation = 0;
+
+  Future<void> _loadFirstPage(ItemFilter filter) async {
+    final generation = ++_generation;
+    emit(ItemsLoading(filter));
+    final result = await _listItems(filter: filter);
+    if (isClosed || generation != _generation) return;
+    emit(switch (result) {
+      Ok(value: final page) => ItemsLoaded(filter, items: page.items, nextCursor: page.nextCursor),
+      Err(:final failure) => ItemsLoadFailed(filter, failure),
+    });
+  }
+  ```
+
+  Test (`blocTest`): ganti filter selagi halaman pertama filter lama belum menjawab → hanya hasil filter baru yang tampil; `loadMore` filter lama yang menjawab setelah filter diganti dibuang.
+- **Aksi di daftar** (centang, hapus massal, dan sejenisnya, tanpa membuka form): diterapkan ke daftar setelah API menjawab, tanpa memuat ulang dan tanpa optimistis. Item yang sedang diproses dinonaktifkan (misalnya `Set<String> updatingIds` di `Loaded`; aksi massal memakai flag sendiri). Kegagalan aksi **tidak** menghapus daftar dan tidak mengganti state menjadi `LoadFailed`: simpan di `Loaded.actionFailure` (dikosongkan saat aksi baru dimulai), lalu halaman menampilkannya sebagai SnackBar lewat `BlocConsumer`/`BlocListener`:
+
+  ```dart
+  listenWhen: (previous, current) =>
+      current is ItemsLoaded &&
+      current.actionFailure != null &&
+      (previous is! ItemsLoaded || previous.actionFailure != current.actionFailure),
+  listener: (context, state) {
+    final failure = (state as ItemsLoaded).actionFailure!;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(failureMessage(failure.code))));
+  },
+  ```
+
+  Aksi massal yang menghapus item (misalnya hapus yang selesai) membuang item itu dari daftar yang sudah dimuat dan mempertahankan `nextCursor`, karena cursor berbasis posisi (`created_at`, `id`) sehingga halaman berikutnya dari API sudah tanpa item itu. Aksi yang merusak (hapus) tetap lewat dialog konfirmasi.
+- **Teks kegagalan khusus fitur di field.** Bila PRD meminta teks tertentu untuk kegagalan tertentu (misalnya `CONFLICT` → "Nama ini sudah dipakai." di field nama), teksnya didefinisikan sebagai konstanta di widget form fitur (`const itemNameConflictMessage = '…';`) dan dipilih dari `failure.code`, **tidak pernah** dari `Failure.message` server (D-03). Urutan: teks khusus dari `code` → `fieldIssueMessage` dari `fieldErrors[<field>]` → kegagalan tanpa field di atas tombol simpan. Kegagalan yang sudah tampil di field tidak ditampilkan lagi di atas tombol. Teks umum tetap di `failure_messages.dart`; hanya teks yang bergantung pada konteks fitur yang ditaruh di fitur. Test: widget test memeriksa `TextField.decoration.errorText` field itu.
+
+  ```dart
+  final nameError = failure?.code == FailureCode.conflict
+      ? itemNameConflictMessage
+      : _fieldError(failure, 'name');
+  final showGeneral = failure != null && nameError == null;
+  ```
+- **Form untuk fitur tanpa `GET` per item.** Notes punya `GET /v1/notes/{id}`, jadi form-nya punya state `Loading`/`LoadFailed` dan rute ubah memanggil `cubit.load(id)` bila `extra` kosong. Fitur yang API-nya tidak punya `GET` per item (tidak dibuat hanya untuk form) memakai varian lebih sederhana:
+  - State form hanya `Editing(item?, status, failure)` / `Saved(item)` / `Deleted(id)`; tidak ada `Loading`/`LoadFailed` dan tidak ada use case `GetXxx`.
+  - Rute ubah (`/<fitur>/:id`) yang dibuka tanpa item di `extra` (URL langsung, muat ulang di web) diarahkan kembali ke daftar lewat `redirect` di `GoRoute`-nya (`state.extra is! Item` → `AppRoutes.items`). Rute buat (`/<fitur>/new`) tetap bisa dibuka lewat URL.
+  - Pola "kembali ke daftar tanpa hasil → muat ulang halaman pertama" tetap berlaku (jalur kedua hanya terjadi lewat `/<fitur>/new`).
+  - Bila form ubah perlu bisa dibuka lewat URL, tambahkan `GET` per item di API (mengubah kontrak) lalu pakai pola notes.
 
 ### Test Flutter
 
@@ -460,6 +561,7 @@ Presentation (`features/notes/presentation/`):
 - HTTP diuji lewat Dio sungguhan dengan `FakeHttpAdapter` (mencatat request, menjawab per request), bukan mock Dio. Contoh: `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`.
 - Fitur berbasis API: use case dengan repository di-mock (`test/features/notes/domain/usecases/*_test.dart`); repository impl dengan data source di-mock yang melempar `DioException.badResponse` berisi body error standar (`test/features/notes/data/api_note_repository_test.dart`); data source dengan `NotesClient` asli + `FakeHttpAdapter` untuk memeriksa method, path, query, dan body request (`test/features/notes/data/note_remote_data_source_test.dart`). Fixture entity dan JSON (`testNote`, `noteJson`, `noteNo(i)`) di `test/features/notes/mocks.dart`.
 - Presentation fitur berbasis API: Cubit dengan use case di-mock (`test/features/notes/presentation/cubit/*_test.dart`); halaman dengan Cubit mock (`pages/*_test.dart`). Halaman yang menutup dirinya dengan `context.pop(hasil)` dipasang di atas `GoRouter` kecil di dalam test agar hasilnya bisa diperiksa (`note_form_page_test.dart`). Error di field diperiksa lewat `TextField.decoration.errorText` field itu, bukan sekadar teks ada di layar. Halaman dengan indikator berputar tidak memakai `pumpAndSettle` (tidak pernah selesai).
+- Widget di `core/widgets/` diuji sendiri di `test/core/widgets/` dengan nilai biasa (tanpa Cubit), agar tetap teruji setelah fitur contoh dihapus (`test/core/widgets/load_more_footer_test.dart`).
 - Alur fitur lengkap lewat router, Cubit, dan use case asli dengan repository palsu yang meniru API (`test/features/notes/fake_note_repository.dart`, `test/features/notes/presentation/notes_flow_test.dart`). Test router yang membuka beranda juga mendaftarkan fitur notes dengan repository palsu itu.
 - Test `config/dev.json` membaca file aslinya, jadi kunci yang hilang terdeteksi (`test/core/config/app_config_test.dart`).
 
@@ -470,6 +572,6 @@ Fitur `notes` ada untuk ditiru (NFR-06). Hapus setelah fitur pertama proyek berd
 1. **API:** hapus `apps/api/src/features/notes/`, `src/db/schema/notes.ts` beserta ekspornya di `schema/index.ts`, dan wiring notes di `src/app.ts`. Buat migrasi baru dengan `pnpm --filter api db:generate --name drop_notes` (migrasi lama tidak diedit atau dihapus).
 2. **Test API:** hapus `test/unit/features/notes/` dan `test/int/notes/`, `insertNote`/`insertNotes` di `test/helpers/factories.ts`, dan `notes.created_at` di `test/int/db/schema.int.test.ts`. Data contoh `notes/...` di test port (`test/unit/core/ports/`, `test/int/ports/`) hanya string, boleh dibiarkan.
 3. **Kontrak:** `pnpm contract:generate`, lalu sesuaikan `packages/contract/dart/test/api_client_test.dart`.
-4. **Flutter:** hapus `lib/features/notes/` dan `test/features/notes/`, `registerNotesDependencies` di `core/di/injection.dart`, rute notes di `core/router/app_router.dart` (arahkan `AppRoutes.home` ke beranda fitur proyek), dan bagian notes di `test/core/di/injection_test.dart`, `test/core/router/app_router_test.dart`, `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`.
+4. **Flutter:** hapus `lib/features/notes/` dan `test/features/notes/`, `registerNotesDependencies` di `core/di/injection.dart`, rute notes di `core/router/app_router.dart` (arahkan `AppRoutes.home` ke beranda fitur proyek), dan bagian notes di `test/core/di/injection_test.dart`, `test/core/router/app_router_test.dart`, `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`. `lib/core/widgets/` (`FailureView`, `LoadMoreFooter`) dan test-nya tetap ada untuk fitur proyek.
 5. **Dokumen:** ganti rujukan file contoh notes di dokumen ini dengan file fitur proyek yang setara.
 6. `git grep -i note` untuk sisa rujukan, lalu `pnpm check` hijau.

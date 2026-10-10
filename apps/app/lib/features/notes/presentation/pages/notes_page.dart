@@ -3,13 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:app/core/router/app_router.dart';
+import 'package:app/core/widgets/failure_view.dart';
+import 'package:app/core/widgets/load_more_footer.dart';
 import 'package:app/features/auth/presentation/widgets/sign_out_button.dart';
 import 'package:app/features/notes/domain/entities/note.dart';
 import 'package:app/features/notes/presentation/cubit/note_form_state.dart';
 import 'package:app/features/notes/presentation/cubit/notes_list_cubit.dart';
 import 'package:app/features/notes/presentation/cubit/notes_list_state.dart';
-import 'package:app/features/notes/presentation/widgets/failure_view.dart';
-import 'package:app/features/notes/presentation/widgets/load_more_footer.dart';
 import 'package:app/features/notes/presentation/widgets/note_tile.dart';
 
 /// Daftar note milik user. Butuh [NotesListCubit] dari `BlocProvider` (dipasang router).
@@ -94,7 +94,8 @@ class _NotesPageState extends State<NotesPage> {
             itemBuilder: (context, index) {
               if (index == loaded.items.length) {
                 return LoadMoreFooter(
-                  state: loaded,
+                  loadingMore: loaded.loadingMore,
+                  failure: loaded.loadMoreFailure,
                   onLoadMore: () => context.read<NotesListCubit>().loadMore(),
                 );
               }

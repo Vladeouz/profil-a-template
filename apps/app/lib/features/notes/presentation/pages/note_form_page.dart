@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:app/core/widgets/failure_view.dart';
 import 'package:app/features/auth/presentation/widgets/sign_out_button.dart';
 import 'package:app/features/notes/presentation/cubit/note_form_cubit.dart';
 import 'package:app/features/notes/presentation/cubit/note_form_state.dart';
-import 'package:app/features/notes/presentation/widgets/failure_view.dart';
 import 'package:app/features/notes/presentation/widgets/note_form.dart';
 
 /// Halaman buat ([noteId] `null`) atau ubah note. Butuh [NoteFormCubit] dari `BlocProvider`
