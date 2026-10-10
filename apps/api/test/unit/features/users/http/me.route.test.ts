@@ -33,7 +33,9 @@ describe('GET /v1/me', () => {
   });
 
   it('401 UNAUTHENTICATED when the verifier rejects the token', async () => {
-    const tokenVerifier: TokenVerifier = { verify: async () => null };
+    const tokenVerifier: TokenVerifier = {
+      verify: async () => ({ ok: false, reason: 'auth/id-token-expired' }),
+    };
 
     const res = await createTestApp({ tokenVerifier }).request('/v1/me', {
       headers: { Authorization: 'Bearer token' },

@@ -1,20 +1,7 @@
-import { Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import { createLogger, REDACTED } from '../../../src/core/logger.js';
+import { REDACTED } from '../../../src/core/logger.js';
+import { captureLogger } from '../../helpers/capture-logger.js';
 import { createTestApp } from '../../helpers/test-app.js';
-
-function captureLogger() {
-  const lines: Record<string, unknown>[] = [];
-  const stream = new Writable({
-    write(chunk, _encoding, callback) {
-      for (const line of chunk.toString().split('\n').filter(Boolean)) lines.push(JSON.parse(line));
-      callback();
-    },
-  });
-  // Stream sinkron dari Writable: pino menulis langsung, tanpa buffer async.
-  const logger = createLogger({ level: 'info' }, stream);
-  return { logger, lines, raw: () => JSON.stringify(lines) };
-}
 
 const TOKEN = 'eyJhbGciOiJSUzI1NiJ9.secret-id-token.signature';
 const EMAIL = 'budi@example.com';

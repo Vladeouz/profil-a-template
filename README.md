@@ -117,10 +117,12 @@ Butuh layanan lokal (`docker compose up -d --wait`) dan `.env`.
 
    ```sh
    cd apps/app
-   flutter run -d chrome --web-port 8081 --dart-define-from-file=config/dev.json
+   flutter run -d chrome --web-port 8081 --web-browser-flag=--incognito --dart-define-from-file=config/dev.json
    ```
 
-   Port web harus `8081`, karena hanya origin itu yang diizinkan `CORS_ORIGINS` di `.env`.
+   Port web harus `8081`, karena hanya origin itu yang diizinkan `CORS_ORIGINS` di `.env`. Flag `--web-browser-flag=--incognito` wajib. Tanpa flag itu, sesi login Firebase yang tersimpan di profil Chrome dari run sebelumnya divalidasi ke server Google asli sebelum app sempat memanggil `useAuthEmulator`. Akibatnya Firebase Auth tidak pernah terhubung ke Auth Emulator, dan login serta daftar gagal dengan "Terjadi kesalahan". Dengan flag ini, setiap `flutter run` dimulai dalam keadaan belum login; muat ulang (F5) dalam run yang sama tetap login. Penjelasan lengkap ada di bagian "Lingkungan Flutter dan Android" di `docs/conventions.md`.
+
+   Penyebab kegagalan yang tampil ke user sebagai teks umum tercatat di konsol `flutter run` (mode debug) sebagai baris `Failure <kode>: <pesan asli>`. Penolakan token di API tercatat di log API (level `warn`, pesan `rejected ID token`) beserta kode error firebase-admin di field `reason`.
 
    Android emulator: nyalakan emulator, lihat id-nya dengan `flutter devices` (misalnya `emulator-5554`), lalu:
 

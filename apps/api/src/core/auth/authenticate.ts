@@ -15,6 +15,8 @@ const BEARER = /^Bearer\s+(\S+)\s*$/i;
 
 // Wajib untuk semua route `/v1/*` (dipasang di `app.ts`). Header tidak ada, bukan Bearer, atau
 // token tidak valid/kedaluwarsa → `401 UNAUTHENTICATED`, tanpa menyentuh tabel `users`.
+// Penolakan token dicatat level `warn` dengan kode error firebase-admin (`reason`) saja, agar
+// penyebab `401` bisa didiagnosis tanpa mencatat token atau isinya.
 export function authenticate({
   verifier,
   resolveUser,
@@ -25,13 +27,13 @@ export function authenticate({
       throw new AppError('UNAUTHENTICATED', 'Missing bearer token');
     }
 
-    const identity = await verifier.verify(match[1]);
-    if (!identity) {
-      c.var.log.info('rejected invalid or expired ID token');
+    const result = await verifier.verify(match[1]);
+    if (!result.ok) {
+      c.var.log.warn({ reason: result.reason }, 'rejected ID token');
       throw new AppError('UNAUTHENTICATED', 'Invalid or expired token');
     }
 
-    c.set('user', await resolveUser(identity));
+    c.set('user', await resolveUser(result.identity));
     await next();
   };
 }

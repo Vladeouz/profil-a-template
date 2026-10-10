@@ -20,7 +20,7 @@ const app = createApp({
   logger: createLogger({ level: 'silent' }),
   corsOrigins: [],
   db,
-  tokenVerifier: { verify: async () => null },
+  tokenVerifier: { verify: async () => ({ ok: false, reason: 'unused' }) },
   ports: { pushSender: createNonePushSender(), fileStorage: createNoneFileStorage() },
 });
 const document = app.getOpenAPI31Document({

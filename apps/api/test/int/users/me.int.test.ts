@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ErrorBody } from '../../../src/core/http/errors.js';
 import { users } from '../../../src/db/schema/index.js';
 import type { UserDto } from '../../../src/features/users/http/me.route.js';
+import { captureLogger } from '../../helpers/capture-logger.js';
 import { useTestDb } from '../../helpers/db.js';
 import {
   createEmulatorTokenVerifier,
@@ -64,6 +65,39 @@ describe('GET /v1/me tanpa token yang valid', () => {
     });
     expect(await userRows()).toHaveLength(0);
   });
+
+  it.each([
+    ['token rusak', () => 'bukan-jwt', 'auth/argument-error'],
+    [
+      'token kedaluwarsa',
+      () => {
+        const past = Math.floor(Date.now() / 1000) - 7200;
+        return unsignedIdToken({ iat: past, auth_time: past, exp: past + 3600 });
+      },
+      'auth/id-token-expired',
+    ],
+    [
+      'token untuk project lain',
+      () => unsignedIdToken({ aud: 'demo-lain' }),
+      'auth/argument-error',
+    ],
+  ])(
+    'mencatat kode error firebase-admin di log warn tanpa token: %s',
+    async (_name, makeToken, reason) => {
+      const log = captureLogger();
+      const token = makeToken();
+
+      await createTestApp({ db: getDb().db, tokenVerifier, logger: log.logger }).request('/v1/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      expect(log.lines.filter((line) => line.msg === 'rejected ID token')).toEqual([
+        expect.objectContaining({ level: 40, reason }),
+      ]);
+      expect(log.raw()).not.toContain(token);
+      expect(log.raw()).not.toContain('demo-lain');
+    },
+  );
 });
 
 describe('GET /v1/me dengan token dari Auth Emulator', () => {

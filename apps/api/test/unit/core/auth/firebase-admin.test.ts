@@ -8,10 +8,10 @@ import {
 
 // FirebaseAuthError tidak punya constructor publik di tipe; dibuat lewat prototype agar
 // `instanceof` tetap berlaku.
-function authError(code: string): FirebaseAuthError {
+function authError(code: string, message = code): FirebaseAuthError {
   return Object.assign(Object.create(FirebaseAuthError.prototype) as FirebaseAuthError, {
     code,
-    message: code,
+    message,
   });
 }
 
@@ -27,9 +27,8 @@ describe('createFirebaseTokenVerifier', () => {
     );
 
     await expect(verifier.verify('token')).resolves.toEqual({
-      firebaseUid: 'uid-1',
-      email: 'a@example.com',
-      displayName: 'Ani',
+      ok: true,
+      identity: { firebaseUid: 'uid-1', email: 'a@example.com', displayName: 'Ani' },
     });
   });
 
@@ -37,22 +36,35 @@ describe('createFirebaseTokenVerifier', () => {
     const verifier = verifierWith(async () => ({ uid: 'uid-2' }) as unknown as DecodedIdToken);
 
     await expect(verifier.verify('token')).resolves.toEqual({
-      firebaseUid: 'uid-2',
-      email: null,
-      displayName: null,
+      ok: true,
+      identity: { firebaseUid: 'uid-2', email: null, displayName: null },
     });
   });
 
   it.each(['auth/argument-error', 'auth/id-token-expired', 'auth/invalid-id-token'])(
-    'returns null for %s',
+    'rejects %s with the error code as reason',
     async (code) => {
       const verifier = verifierWith(async () => {
         throw authError(code);
       });
 
-      await expect(verifier.verify('token')).resolves.toBeNull();
+      await expect(verifier.verify('token')).resolves.toEqual({ ok: false, reason: code });
     },
   );
+
+  it('uses only the error code as reason, never the message (it can quote token claims)', async () => {
+    const verifier = verifierWith(async () => {
+      throw authError(
+        'auth/argument-error',
+        'Firebase ID token has incorrect "aud" (audience) claim. Expected "demo-template" but got "demo-lain".',
+      );
+    });
+
+    const result = await verifier.verify('token');
+
+    expect(result).toEqual({ ok: false, reason: 'auth/argument-error' });
+    expect(JSON.stringify(result)).not.toContain('demo-lain');
+  });
 
   it('rethrows auth/internal-error (token could not be verified at all)', async () => {
     const error = authError('auth/internal-error');

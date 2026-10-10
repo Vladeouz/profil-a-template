@@ -9,7 +9,9 @@ export const TEST_ORIGIN = 'http://localhost:8081';
 
 // Menolak semua token. Integration test yang butuh login memberi `tokenVerifier` dari
 // `createEmulatorTokenVerifier()` (test/helpers/emulator-token.ts) dan `db` dari `useTestDb()`.
-export const rejectAllTokens: TokenVerifier = { verify: async () => null };
+export const rejectAllTokens: TokenVerifier = {
+  verify: async () => ({ ok: false, reason: 'auth/argument-error' }),
+};
 
 // App lengkap (middleware, error handler, route) dengan logger senyap, satu origin CORS, dan port
 // palsu. Test yang perlu memeriksa pesan push atau file memberi `ports` sendiri.

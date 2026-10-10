@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { authenticate } from '../../../../src/core/auth/authenticate.js';
-import type { TokenVerifier, VerifiedIdentity } from '../../../../src/core/auth/firebase-admin.js';
+import type {
+  TokenVerifier,
+  VerifiedIdentity,
+  VerifyResult,
+} from '../../../../src/core/auth/firebase-admin.js';
 import type { ErrorBody } from '../../../../src/core/http/errors.js';
 import type { User } from '../../../../src/features/users/domain/user.js';
+import { captureLogger } from '../../../helpers/capture-logger.js';
 import { createTestApp } from '../../../helpers/test-app.js';
 
 const identity: VerifiedIdentity = {
@@ -20,21 +25,24 @@ const user: User = {
   createdAt: new Date('2026-10-01T00:00:00Z'),
 };
 
+const accepted: VerifyResult = { ok: true, identity };
+
 // App dengan satu route terlindungi yang mengembalikan `c.var.user`.
 function setup(verify: TokenVerifier['verify']) {
   const verifier = { verify: vi.fn(verify) };
   const resolveUser = vi.fn(async () => user);
-  const app = createTestApp();
+  const log = captureLogger();
+  const app = createTestApp({ logger: log.logger });
   app.use('/protected/*', authenticate({ verifier, resolveUser }));
   app.get('/protected/whoami', (c) => c.json({ id: c.var.user.id }));
   const request = (headers: Record<string, string> = {}) =>
     app.request('/protected/whoami', { headers });
-  return { verifier, resolveUser, request };
+  return { verifier, resolveUser, request, log };
 }
 
 describe('authenticate', () => {
   it('401 without an Authorization header, without verifying or resolving', async () => {
-    const { verifier, resolveUser, request } = setup(async () => identity);
+    const { verifier, resolveUser, request } = setup(async () => accepted);
 
     const res = await request();
 
@@ -49,7 +57,7 @@ describe('authenticate', () => {
   it.each(['Basic abc', 'Bearer', 'Bearer ', 'Bearer a b', 'abc'])(
     '401 for a malformed header: %s',
     async (header) => {
-      const { verifier, request } = setup(async () => identity);
+      const { verifier, request } = setup(async () => accepted);
 
       const res = await request({ Authorization: header });
 
@@ -59,7 +67,10 @@ describe('authenticate', () => {
   );
 
   it('401 when the verifier rejects the token, without resolving a user', async () => {
-    const { resolveUser, request } = setup(async () => null);
+    const { resolveUser, request } = setup(async () => ({
+      ok: false,
+      reason: 'auth/id-token-expired',
+    }));
 
     const res = await request({ Authorization: 'Bearer bad-token' });
 
@@ -70,8 +81,29 @@ describe('authenticate', () => {
     expect(resolveUser).not.toHaveBeenCalled();
   });
 
+  it('logs the rejection reason at warn level without the token', async () => {
+    const token = 'eyJhbGciOiJSUzI1NiJ9.secret-claims.signature';
+    const { request, log } = setup(async () => ({ ok: false, reason: 'auth/id-token-expired' }));
+
+    await request({ Authorization: `Bearer ${token}` });
+
+    const rejected = log.lines.filter((line) => line.msg === 'rejected ID token');
+    expect(rejected).toEqual([
+      expect.objectContaining({ level: 40, reason: 'auth/id-token-expired' }),
+    ]);
+    expect(log.raw()).not.toContain('secret-claims');
+  });
+
+  it('does not log a rejection when the header is missing', async () => {
+    const { request, log } = setup(async () => accepted);
+
+    await request();
+
+    expect(log.lines.filter((line) => line.msg === 'rejected ID token')).toEqual([]);
+  });
+
   it('passes the token to the verifier, resolves the user, and sets c.var.user', async () => {
-    const { verifier, resolveUser, request } = setup(async () => identity);
+    const { verifier, resolveUser, request } = setup(async () => accepted);
 
     const res = await request({ Authorization: 'bearer good-token' });
 

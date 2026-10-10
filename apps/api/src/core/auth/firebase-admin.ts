@@ -9,11 +9,15 @@ export interface VerifiedIdentity {
   displayName: string | null;
 }
 
+// Hasil verifikasi. `reason` adalah kode error firebase-admin (`auth/id-token-expired`,
+// `auth/argument-error`, ...) untuk log; tidak pernah berisi token atau isinya.
+export type VerifyResult = { ok: true; identity: VerifiedIdentity } | { ok: false; reason: string };
+
 // Port verifikasi token; middleware `authenticate` hanya bergantung pada interface ini.
 export interface TokenVerifier {
-  // `null` bila token tidak valid, kedaluwarsa, atau bukan untuk project ini.
+  // `ok: false` bila token tidak valid, kedaluwarsa, atau bukan untuk project ini.
   // Error lain (misalnya sertifikat Google tidak bisa diambil) dilempar ulang.
-  verify(idToken: string): Promise<VerifiedIdentity | null>;
+  verify(idToken: string): Promise<VerifyResult>;
 }
 
 export interface FirebaseAdmin {
@@ -39,12 +43,18 @@ export function createFirebaseTokenVerifier(auth: Pick<Auth, 'verifyIdToken'>): 
       try {
         const decoded = await auth.verifyIdToken(idToken);
         return {
-          firebaseUid: decoded.uid,
-          email: decoded.email ?? null,
-          displayName: typeof decoded.name === 'string' ? decoded.name : null,
+          ok: true,
+          identity: {
+            firebaseUid: decoded.uid,
+            email: decoded.email ?? null,
+            displayName: typeof decoded.name === 'string' ? decoded.name : null,
+          },
         };
       } catch (err) {
-        if (err instanceof FirebaseAuthError && err.code !== UNVERIFIABLE) return null;
+        // Hanya `code`: `message` firebase-admin bisa memuat isi token (klaim `aud`, `iss`, `sub`).
+        if (err instanceof FirebaseAuthError && err.code !== UNVERIFIABLE) {
+          return { ok: false, reason: err.code };
+        }
         throw err;
       }
     },
