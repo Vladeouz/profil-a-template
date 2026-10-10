@@ -112,7 +112,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `docs/conventions.md`, `CLAUDE.md`, `README.md`, `docs/template-build/`, `spikes/` (dihapus)
   - done when: `docs/conventions.md` memuat semua konvensi bagian 3 dan 5 PRD, versi library yang dipin, dan rujukan ke file contoh untuk setiap konvensi; PRD, TASKS, dan log pembangunan template dipindah ke `docs/template-build/`; `spikes/` dihapus; `pnpm check` tetap hijau
 
-- [ ] T-021 Script `pnpm init-project <nama>`
+- [x] T-021 Script `pnpm init-project <nama>`
   - layer: infra · depends_on: T-020 · refs: FR-16
   - files: `scripts/init-project.mjs`, `package.json`, `README.md`, `docs/PRD.md` dan `docs/TASKS.md` (placeholder)
   - done when: dijalankan pada salinan repo (bukan repo template itu sendiri) dengan nama `uji-proyek`, script mengganti `demo-template` menjadi `demo-uji-proyek`, nama database, dan judul README, mengganti `docs/PRD.md` dan `docs/TASKS.md` dengan placeholder, serta mengosongkan `docs/logs/`; `pnpm check` hijau di salinan itu; menjalankan script dua kali ditolak dengan pesan jelas
