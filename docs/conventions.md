@@ -1,6 +1,30 @@
 # Konvensi Proyek
 
-Dokumen ini adalah rujukan konvensi untuk manusia dan agent. Sumber aslinya PRD bagian 3 dan 5; setiap bagian nanti merujuk file contoh di repo. Bagian yang belum diisi ditandai dengan task yang akan mengisinya.
+Dokumen ini adalah rujukan konvensi untuk manusia dan agent, dan berlaku untuk setiap proyek yang dibuat dari template ini. Isinya mencakup semua konvensi bagian 3 dan 5 PRD pembangunan template (`docs/template-build/PRD.md`) beserta yang ditemukan selama pembangunan (alasannya ada di `docs/template-build/logs/`). Setiap bagian merujuk file contoh di repo: tiru file itu sebelum menulis pola sendiri. Konvensi baru ditambahkan di sini bersamaan dengan kode yang pertama memakainya.
+
+## Struktur repo
+
+```
+.
+├── CLAUDE.md                  # aturan kerja agent
+├── package.json               # script root: prereq, check, lint, format, contract:generate, contract:check
+├── pnpm-workspace.yaml        # workspace apps/*, packages/*; allowBuilds
+├── biome.json .editorconfig .gitattributes .nvmrc .env.example
+├── docker-compose.yml docker/firebase-emulator/Dockerfile
+├── firebase.json .firebaserc storage.rules
+├── scripts/                   # prereq.mjs, check.mjs, contract.mjs
+├── .github/workflows/ci.yml
+├── docs/                      # PRD.md, TASKS.md, logs/ (proyek), conventions.md, template-build/
+├── apps/api/                  # API Hono (lihat bagian API dan Clean Architecture API)
+├── packages/contract/         # openapi.json + package Dart api_client (hasil generate)
+└── apps/app/                  # Flutter (lihat bagian Flutter)
+```
+
+pnpm workspaces tanpa Turborepo (D-09). Paket: `api` (`apps/api`), `app` (`apps/app`, Flutter, bukan paket pnpm), dan `api_client` (`packages/contract/dart`, Dart).
+
+## Prasyarat lingkungan
+
+Diperiksa `pnpm prereq` (`scripts/prereq.mjs`), yang menampilkan tabel status beserta perintah perbaikan dan tidak pernah membuat atau mengubah file. Wajib: Node.js 24, pnpm versi `packageManager` (lewat `corepack enable`), Git, Docker dengan engine hidup (Docker Desktop di Windows), Flutter stable, dan file `.env` (disalin user dari `.env.example`; agent tidak membuatnya). Opsional (peringatan, bukan kegagalan): Android SDK + emulator, NDK/SDK Platform, lokasi Pub cache, dan status layanan Compose. Prasyarat baru ditambahkan ke `prereq.mjs` dan tabel Prasyarat di `README.md`.
 
 ## Versi yang dipin
 
@@ -64,6 +88,30 @@ pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila 
 - Script memanggil perintah eksternal lewat `spawnSync(perintah, { shell: true })` agar `pnpm.cmd`, `flutter.bat`, dan sejenisnya ditemukan di Windows.
 - Nama script di `package.json` root tidak boleh sama dengan perintah bawaan pnpm (misalnya `doctor`, `init`, `test`, `ci`), karena perintah bawaan selalu menang. Cek dengan `pnpm help <nama>`: bila keluar `unrecognized subcommand`, nama itu aman (PRD D-14).
 - Nama file script sama dengan nama script-nya (`pnpm prereq` → `scripts/prereq.mjs`).
+- Perintah per paket dijalankan dari root dengan `pnpm --filter <paket> <script>` (`pnpm --filter api dev`); tidak ada script root `dev`.
+
+### `pnpm check` dan CI
+
+- `pnpm check` (`scripts/check.mjs`) adalah satu-satunya perintah verifikasi: Biome, typecheck API, unit test API, integration test API, `contract:check`, `flutter analyze`, `flutter test`. Semua langkah selalu dijalankan walaupun ada yang gagal; ringkasan di akhir menampilkan status dan waktu per langkah, dan output lengkap langkah yang gagal disimpan di `.check-logs/<waktu run>/` (di-ignore Git). Harus hijau sebelum task dicentang.
+- Langkah verifikasi baru (tool baru, paket baru) ditambahkan ke `STEPS` di `scripts/check.mjs`, bukan ke `ci.yml`.
+- CI (`.github/workflows/ci.yml`) hanya menjalankan `pnpm check` pada setiap push dan pull request, dengan PostgreSQL sebagai `services` dan emulator Firebase lewat `docker compose` (image di-build dengan cache GitHub Actions). Env tidak di-set di CI: default di `apps/api/test/setup/env.ts` sudah menunjuk layanan itu. Bila gagal, output langkahnya ada di artifact `check-logs`.
+- Versi Flutter di `ci.yml` diperbarui bersamaan dengan README dan tabel versi di atas. Action dipin ke major tag.
+
+## Layanan lokal
+
+`docker compose up -d --wait` (`docker-compose.yml`) menjalankan:
+
+| Service | Port | Isi |
+| --- | --- | --- |
+| `postgres` | 5432 | PostgreSQL 17, data di volume `postgres-data` |
+| `firebase-auth` | 9099 | Auth Emulator, project `demo-template` |
+| `firebase-storage` | 9199 | Storage Emulator, bucket `demo-template.appspot.com` |
+
+- Kedua emulator memakai image `profil-a/firebase-emulator:local` dari `docker/firebase-emulator/Dockerfile` (firebase-tools dipin). Project Firebase `demo-*` (`.firebaserc`) agar emulator tidak pernah menyentuh project sungguhan.
+- Nilai compose diambil dari `.env` dengan default yang sama dengan `.env.example` (`${POSTGRES_DB:-template}`), sehingga compose tetap jalan tanpa `.env` (CI).
+- Setiap service punya healthcheck, sehingga `--wait` hanya selesai bila layanan benar-benar siap. Healthcheck Storage memakai list objek dengan `Bearer owner`, karena root emulator menjawab `501`.
+- `firebase.json` dan `storage.rules` di-mount ke container. Setelah diubah: `docker compose up -d --wait --force-recreate firebase-storage` (tanpa build ulang). `storage.rules` menolak semua akses client; aturan per proyek ditambahkan di sana bila client mengakses Storage langsung.
+- Data Auth Emulator hanya di memori (hilang saat container dibuat ulang); test membuat akun dengan email acak dan tidak membersihkan emulator.
 
 ## Lint dan format (Biome)
 
@@ -77,8 +125,15 @@ pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila 
 
 Dicek oleh `pnpm prereq` sebagai prasyarat opsional (peringatan, bukan kegagalan); ditemukan di T-004, dipakai untuk `apps/app` sejak T-013.
 
-- **Pub cache satu drive dengan repo (Windows).** Bila repo dan pub cache beda drive (misalnya repo di `D:` dan pub cache bawaan di `%LOCALAPPDATA%\Pub\Cache`), build Android gagal saat kompilasi Kotlin plugin: `Could not close incremental caches … this and base files have different roots`. Atasi di mesin, bukan di proyek: `setx PUB_CACHE D:\pub-cache`, buka terminal baru, lalu `flutter pub get` ulang. `prereq` memperingatkan bila drive repo berbeda dengan drive `PUB_CACHE` (atau lokasi bawaannya) dan menyarankan nilai `setx` yang tepat. Jangan menambah `kotlin.incremental=false` ke `apps/app/android/gradle.properties`; pengaturan itu hanya ada di spike T-004.
+- **Pub cache satu drive dengan repo (Windows).** Bila repo dan pub cache beda drive (misalnya repo di `D:` dan pub cache bawaan di `%LOCALAPPDATA%\Pub\Cache`), build Android gagal saat kompilasi Kotlin plugin: `Could not close incremental caches … this and base files have different roots`. Atasi di mesin, bukan di proyek: `setx PUB_CACHE D:\pub-cache`, buka terminal baru, lalu `flutter pub get` ulang. `prereq` memperingatkan bila drive repo berbeda dengan drive `PUB_CACHE` (atau lokasi bawaannya) dan menyarankan nilai `setx` yang tepat. Jangan menambah `kotlin.incremental=false` ke `apps/app/android/gradle.properties`; pengaturan itu hanya dipakai di spike T-004 (sudah dihapus).
 - **NDK dan SDK Platform Android dipasang sebelum build pertama.** Gradle bisa macet bila memasangnya sendiri. Yang dibutuhkan: NDK dan `compileSdk` bawaan Flutter (dibaca `prereq` dari `FlutterExtension.kt` di Flutter SDK; Flutter 3.47.5: NDK `28.2.13676358`, platform 36) serta platform 34 untuk plugin `firebase_core` dan `firebase_auth`. Pasang dengan `%LOCALAPPDATA%\Android\Sdk\cmdline-tools\latest\bin\android.exe sdk install ndk/<versi> platforms/android-<level>` (cmdline-tools lama: `sdkmanager "ndk;<versi>"`). `prereq` menganggap paket terpasang hanya bila isinya lengkap (`source.properties` untuk NDK, `android.jar` untuk platform), jadi folder setengah jadi ikut dilaporkan.
+
+## TypeScript
+
+- `strict` + `noUncheckedIndexedAccess`, `module`/`moduleResolution` `NodeNext`, `verbatimModuleSyntax` (`import type` untuk tipe). Konfigurasi di `apps/api/tsconfig.json`; build produksi memakai `apps/api/tsconfig.build.json` (hanya `src`, keluaran `dist/` dengan struktur sama).
+- Import relatif selalu berakhiran `.js` (`import { AppError } from '../core/http/errors.js';`), walaupun file sumbernya `.ts`.
+- Nama file kebab-case; akhiran menandai peran: `.route.ts`, `.job.ts`, `drizzle-<entity>-repository.ts`, `.test.ts`, `.int.test.ts`.
+- Lint dan format dengan Biome (lihat di atas); typecheck `pnpm --filter api typecheck`.
 
 ## API
 
@@ -173,7 +228,23 @@ Helper di `apps/api/src/core/http/pagination.ts`. Contoh route: `listNotesRoute`
 
 ## Format error
 
-Bentuk dan daftar `ErrorCode` mengikuti PRD bagian 5. Implementasi di `apps/api/src/core/http/errors.ts` dan `error-codes.ts`.
+Implementasi di `apps/api/src/core/http/errors.ts` dan `error-codes.ts`. Semua error memakai satu bentuk:
+
+```json
+{ "error": { "code": "VALIDATION_ERROR", "message": "Request validation failed", "details": { "title": [ { "code": "too_small", "message": "Too small: expected string to have >=1 characters" } ] } } }
+```
+
+| ErrorCode | HTTP | Kapan |
+| --- | --- | --- |
+| `BAD_REQUEST` | 400 | JSON rusak atau request tidak bisa diproses |
+| `UNAUTHENTICATED` | 401 | Header `Authorization` tidak ada, token tidak valid, atau kedaluwarsa |
+| `FORBIDDEN` | 403 | User terautentikasi tetapi tidak berhak (aturan peran di proyek) |
+| `NOT_FOUND` | 404 | Resource tidak ada, atau milik user lain (D-07) |
+| `CONFLICT` | 409 | Pelanggaran keunikan atau state |
+| `VALIDATION_ERROR` | 422 | Validasi Zod gagal pada body, path, atau query |
+| `INTERNAL_ERROR` | 500 | Error tak terduga; pesan asli tidak pernah dikirim ke client |
+
+`code` stabil dan menjadi dasar teks untuk user di Flutter (D-03). Daftar `ErrorCode` diekspor ke OpenAPI sebagai enum, sehingga client Dart punya daftar yang sama. Kode baru ditambahkan ke `error-codes.ts` (beserta status HTTP-nya), lalu `pnpm contract:generate`, lalu dipetakan di `failureCodeOf` dan `failure_messages.dart` di Flutter.
 
 - Lempar `new AppError('NOT_FOUND', 'Note not found')` dari use case atau middleware; status HTTP diturunkan dari `code`. `message` bahasa Inggris untuk developer. `AppError` tidak membawa `details`.
 - `details` hanya untuk `VALIDATION_ERROR` (`ValidationError`). Validasi Zod di route ditangani otomatis oleh `defaultHook`; validasi manual di luar route memakai `new ValidationError(validationDetails(issues, input))`.
@@ -195,6 +266,9 @@ Bentuk dan daftar `ErrorCode` mengikuti PRD bagian 5. Implementasi di `apps/api/
 - Log diperiksa dengan `createLogger({ level: 'info' }, stream)` memakai `Writable` yang menampung baris JSON (contoh: `test/unit/core/logger.test.ts`).
 - Setiap use case punya unit test dengan repository palsu di memori yang meniru perilaku implementasi Drizzle (pembatasan pemilik, urutan, cursor). Repository palsu fitur ditaruh di `test/unit/features/<fitur>/fake-<nama>-repository.ts` (bukan `*.test.ts`, jadi tidak dijalankan sendiri). Contoh: `test/unit/features/notes/fake-note-repository.ts`, `test/unit/features/notes/usecases/*.test.ts`.
 - Unit test route memeriksa pemetaan DTO dan dokumen OpenAPI (operationId, security, status, nama skema); perilaku route yang butuh login diuji di integration test. Contoh: `test/unit/features/notes/http/notes.route.test.ts`, `test/int/notes/notes.int.test.ts`.
+- Unit test yang menjalankan proses anak (`spawnSync`) memberi timeout per test lebih besar dari `timeout` proses anaknya, bukan menaikkan `testTimeout` global; start dingin `tsx` di Windows bisa lebih dari 5 detik bawaan Vitest. Contoh: `test/unit/server.test.ts`.
+- Integration test yang memeriksa keadaan server PostgreSQL (`pg_stat_activity` dan sejenisnya) membatasi ke `datname = current_database()`, karena API dev bisa berjalan bersamaan di database utama. Contoh: `test/int/jobs/boss.int.test.ts`.
+- Tidak ada retry otomatis untuk test yang gagal acak; cari dan perbaiki penyebabnya (output lengkap di `.check-logs/`).
 - Keadaan awal integration test dibuat dengan `insertUser`, `insertNote`, `insertNotes` dari `test/helpers/factories.ts`; data yang diuji lewat HTTP tetap dibuat lewat route. Integration test yang butuh `userId` login memanggil `GET /v1/me` dulu (helper `login()` di `test/int/notes/notes.int.test.ts`).
 
 ## Clean Architecture API
@@ -222,6 +296,17 @@ features/<fitur>/
 - Aturan bisnis (wajib diisi, batas panjang, keunikan, hak akses, minimal satu field) ditegakkan di API: skema Zod route, use case, dan constraint database. API adalah satu-satunya sumber kebenaran dan harus aman walau client mengirim input apa pun.
 - Client (Flutter) boleh menormalisasi input sebelum dikirim (misalnya `trim` judul atau email) dan boleh menampilkan validasi lokal yang sama dengan API untuk umpan balik cepat, tetapi **tidak boleh lebih ketat dari API**: input yang diterima API tidak boleh ditolak client. Bila aturan berubah, ubah API dulu; error validasi API (`details`) tetap ditampilkan per field.
 
+### Organisasi dan tenancy (pola, belum ada di template)
+
+D-11: template hanya mengenal "user yang login" dengan data milik user (`notes.user_id`). Proyek yang butuh organisasi, tim, atau peran memakai pola berikut. Belum ada file contohnya; tiru fitur notes dengan `user_id` diganti `organization_id`, dan catat implementasi pertamanya di sini sebagai file contoh.
+
+- Tabel `organizations` (`id`, `name`, timestamp) dan `memberships` (`organization_id` dan `user_id`, keduanya FK `ON DELETE CASCADE`; `role` sebagai `text` + CHECK, misalnya `owner`/`admin`/`member`; UNIQUE `(organization_id, user_id)`). Data milik organisasi memakai `organization_id` FK `ON DELETE CASCADE`, dengan index pagination `(organization_id, created_at DESC, id DESC)`.
+- Path bersarang `/v1/organizations/{organizationId}/<resource>`, sehingga tetap di bawah `authenticate`. Middleware keanggotaan di `/v1/organizations/:organizationId/*` membaca membership user login dan menaruhnya di context (`c.var.membership`); `organizationId` yang bukan UUID → `422 details.organizationId`.
+- Bukan anggota → `404 NOT_FOUND` (sama dengan resource milik user lain, D-07). Anggota dengan peran yang tidak cukup → `403 FORBIDDEN`. Pemeriksaan peran ada di use case (`AppError('FORBIDDEN', …)`), bukan di route, agar teruji di unit test.
+- Repository dibatasi organisasi dengan cara yang sama seperti dibatasi pemilik: setiap metode menerima `organizationId` dan memfilternya di query yang sama.
+- Integration test minimal: bukan anggota → `404`, peran kurang → `403`, anggota organisasi lain tidak melihat data. Route baru otomatis diperiksa `all-routes-require-auth.int.test.ts`.
+- Organisasi "aktif" di Flutter disimpan di state presentation (bukan di token) dan dikirim sebagai path, bukan header.
+
 ## Kontrak dan client Dart
 
 D-01, D-02: route Hono adalah satu-satunya sumber kebenaran. `packages/contract/openapi.json` (OpenAPI 3.1) dan package Dart `api_client` di `packages/contract/dart/` adalah hasil generate yang di-commit; jangan diedit manual.
@@ -235,6 +320,16 @@ D-01, D-02: route Hono adalah satu-satunya sumber kebenaran. `packages/contract/
 - `ErrorCode` menjadi enum Dart dengan nilai `$unknown` untuk kode yang belum dikenal (`unknown_enum_value: true`); Flutter memetakan `$unknown` ke teks umum. Respons error sampai di dio sebagai `DioException` dengan `response.data` berupa `Map`, dibaca dengan `ErrorBody.fromJson`.
 - Field opsional yang `null` tidak dikirim di body request (`include_if_null: true` di `swagger_parser.yaml` → `@JsonKey(includeIfNull: false)`), karena API menolak `null` pada field `optional()` (`invalid_type`). Field wajib yang nullable (`nextCursor`, `User.email`) tetap ditulis sebagai `null`. Dijaga `packages/contract/dart/test/api_client_test.dart` dan `apps/app/test/features/notes/data/note_remote_data_source_test.dart`.
 - Waktu: `build_runner` pertama ~35–45 detik (kompilasi builder; juga berlaku untuk `contract:check` bila `dart/.dart_tool` belum ada, misalnya di CI). Setelah itu `contract:check` ~6 detik karena `.dart_tool` ikut disalin ke folder sementara.
+
+## Image produksi API
+
+`apps/api/Dockerfile` (multi-stage di atas `node:24-trixie-slim`, pnpm lewat `corepack enable`) membangun image berisi `dist/` hasil `pnpm --filter api build`, folder `drizzle/`, dan dependency produksi saja. Cara build dan menjalankan ada di README, bagian "Image produksi API".
+
+- Build selalu dari root repo: `docker build -f apps/api/Dockerfile -t profil-a/api:local .`
+- `.dockerignore` di root berbentuk allowlist (`*` lalu `!…`), jadi `.env` dan `node_modules` lokal tidak pernah ikut. File baru yang dibutuhkan build (misalnya folder di luar `apps/api/src` dan `apps/api/drizzle`) wajib ditambahkan di sana.
+- Dependency produksi baru otomatis ikut lewat `pnpm install --prod --filter api`; dependency yang hanya dipakai test atau tool masuk `devDependencies` agar tidak ikut image.
+- Migrasi selalu dijalankan sebagai perintah terpisah sebelum server, dengan image yang sama: `node dist/db/migrate.js`. Server (`node dist/server.js`) tidak menjalankan migrasi sendiri.
+- Image berjalan sebagai user `node` dengan `NODE_ENV=production`, sehingga host emulator dan adapter `fake` ditolak `loadEnv()`. `HEALTHCHECK` memanggil `/health` dengan `fetch` Node; `SIGTERM` menjalankan shutdown bertahap.
 
 ## Flutter
 
@@ -253,6 +348,8 @@ lib/
     ├── router/app_router.dart
     └── theme/app_theme.dart
 ```
+
+Arah dependency (Clean Architecture): `presentation` (widget + Cubit) → `domain` ← `data`. `domain` berisi Dart murni: tidak mengimpor Flutter, dio, firebase, atau `api_client`. State Cubit adalah sealed class Dart 3. Teks UI Bahasa Indonesia.
 
 Fitur di `lib/features/<fitur>/` (contoh lengkap: `features/auth/`):
 
@@ -362,3 +459,14 @@ Presentation (`features/notes/presentation/`):
 - Presentation fitur berbasis API: Cubit dengan use case di-mock (`test/features/notes/presentation/cubit/*_test.dart`); halaman dengan Cubit mock (`pages/*_test.dart`). Halaman yang menutup dirinya dengan `context.pop(hasil)` dipasang di atas `GoRouter` kecil di dalam test agar hasilnya bisa diperiksa (`note_form_page_test.dart`). Error di field diperiksa lewat `TextField.decoration.errorText` field itu, bukan sekadar teks ada di layar. Halaman dengan indikator berputar tidak memakai `pumpAndSettle` (tidak pernah selesai).
 - Alur fitur lengkap lewat router, Cubit, dan use case asli dengan repository palsu yang meniru API (`test/features/notes/fake_note_repository.dart`, `test/features/notes/presentation/notes_flow_test.dart`). Test router yang membuka beranda juga mendaftarkan fitur notes dengan repository palsu itu.
 - Test `config/dev.json` membaca file aslinya, jadi kunci yang hilang terdeteksi (`test/core/config/app_config_test.dart`).
+
+## Menghapus fitur contoh notes
+
+Fitur `notes` ada untuk ditiru (NFR-06). Hapus setelah fitur pertama proyek berdiri dan sudah menggantikannya sebagai contoh, dalam satu task tersendiri:
+
+1. **API:** hapus `apps/api/src/features/notes/`, `src/db/schema/notes.ts` beserta ekspornya di `schema/index.ts`, dan wiring notes di `src/app.ts`. Buat migrasi baru dengan `pnpm --filter api db:generate --name drop_notes` (migrasi lama tidak diedit atau dihapus).
+2. **Test API:** hapus `test/unit/features/notes/` dan `test/int/notes/`, `insertNote`/`insertNotes` di `test/helpers/factories.ts`, dan `notes.created_at` di `test/int/db/schema.int.test.ts`. Data contoh `notes/...` di test port (`test/unit/core/ports/`, `test/int/ports/`) hanya string, boleh dibiarkan.
+3. **Kontrak:** `pnpm contract:generate`, lalu sesuaikan `packages/contract/dart/test/api_client_test.dart`.
+4. **Flutter:** hapus `lib/features/notes/` dan `test/features/notes/`, `registerNotesDependencies` di `core/di/injection.dart`, rute notes di `core/router/app_router.dart` (arahkan `AppRoutes.home` ke beranda fitur proyek), dan bagian notes di `test/core/di/injection_test.dart`, `test/core/router/app_router_test.dart`, `test/core/network/auth_interceptor_test.dart`, `test/core/network/error_mapper_test.dart`.
+5. **Dokumen:** ganti rujukan file contoh notes di dokumen ini dengan file fitur proyek yang setara.
+6. `git grep -i note` untuk sisa rujukan, lalu `pnpm check` hijau.

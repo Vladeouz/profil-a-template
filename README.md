@@ -1,9 +1,16 @@
 # Template Starter Profil A
 
 Template untuk proyek Profil A: Flutter (web, Android, iOS) + API Hono + PostgreSQL + Firebase.
-Rencana dan status pembangunan template ada di `docs/PRD.md` dan `docs/TASKS.md`; konvensi proyek ada di `docs/conventions.md`.
+## Dokumen
 
-> Template masih dibangun. Bagian di bawah diperbarui setiap task selesai.
+| Dokumen | Isi |
+| --- | --- |
+| `docs/conventions.md` | Konvensi proyek (struktur, API, database, error, test, Flutter, CI) dengan rujukan ke file contoh. Wajib dibaca sebelum menulis kode. |
+| `CLAUDE.md` | Aturan kerja Claude Code: satu task per sesi, branch, verifikasi, log per task. |
+| `docs/PRD.md`, `docs/TASKS.md`, `docs/logs/` | Rencana, daftar task, dan log proyek (diisi saat proyek baru dimulai dari template ini). |
+| `docs/template-build/` | PRD, TASKS, dan log pembangunan template ini (rujukan sejarah: alasan di balik setiap konvensi). |
+
+Fitur `notes` di API dan Flutter adalah contoh pola lengkap dari database sampai UI, untuk ditiru lalu dihapus (lihat "Menghapus fitur contoh notes" di `docs/conventions.md`).
 
 ## Prasyarat
 
@@ -69,6 +76,7 @@ Menjalankan berurutan: Biome (`pnpm lint`), typecheck API, unit test API, integr
 - Integration test butuh layanan lokal (`docker compose up -d --wait`). Bila Docker mati, langkah itu gagal dengan pesan yang menyebut Docker.
 - Waktu total sekitar 1 menit di laptop pengembang (target di bawah 5 menit), setelah dependency terpasang dan image emulator sudah ada. `contract:check` pertama kali bisa lebih lama karena `dart pub get`.
 - Integration test memakai database `<POSTGRES_DB>_test` tersendiri, jadi aman dijalankan saat API sedang berjalan.
+- CI (`.github/workflows/ci.yml`) menjalankan `pnpm check` yang sama pada setiap push dan pull request. Bila gagal, output langkah yang gagal tersedia sebagai artifact `check-logs` di run GitHub Actions.
 
 ## Menjalankan API dan Flutter
 
