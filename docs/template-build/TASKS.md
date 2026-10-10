@@ -121,7 +121,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
 
 Sumber: log T-001 sampai T-007 di repo `daftar-belanja` (`D:\dev\daftar-belanja\docs\logs\`) dan `docs/conventions.md` di repo itu. Repo tersebut boleh dibaca sebagai rujukan; jangan menyalin apa pun yang spesifik daftar belanja.
 
-- [ ] T-022 Konvensi pola lanjutan dan widget bersama Flutter
+- [x] T-022 Konvensi pola lanjutan dan widget bersama Flutter
   - layer: docs, app · depends_on: T-021 · refs: NFR-06
   - files: `docs/conventions.md`, `apps/app/lib/core/widgets/` (baru), `apps/app/lib/features/notes/presentation/**`, `apps/app/test/**`
   - done when: `docs/conventions.md` memuat pola yang ditemukan di uji agent, masing-masing dengan file contoh di template bila ada: pelanggaran keunikan (constraint bernama → error domain di repository → `CONFLICT` di use case), penamaan skema respons endpoint aksi non-CRUD (`<Operasi>Result`), daftar berpagination dengan filter (membuang hasil request lama saat filter diganti), kegagalan aksi di daftar lewat SnackBar, teks kegagalan khusus fitur di field yang tetap diturunkan dari `code`, dan varian form untuk fitur tanpa `GET` per item; `FailureView` dan `LoadMoreFooter` dipindah dari fitur notes ke `apps/app/lib/core/widgets/` dan notes memakainya dari sana; `pnpm check` hijau
