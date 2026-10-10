@@ -97,7 +97,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `scripts/check.mjs`, `package.json`, `README.md`
   - done when: `pnpm check` menjalankan semua langkah FR-03 dan menampilkan ringkasan; terbukti exit code bukan 0 saat satu langkah sengaja digagalkan; waktu total dicatat di log (target di bawah 5 menit); README berisi urutan dari clone sampai `pnpm check` hijau, termasuk perintah menjalankan API dan Flutter (`--web-port 8081`)
 
-- [ ] T-018 CI GitHub Actions
+- [x] T-018 CI GitHub Actions
   - layer: infra · depends_on: T-017 · refs: FR-14
   - files: `.github/workflows/ci.yml`
   - done when: workflow menjalankan langkah yang sama dengan `pnpm check` memakai service PostgreSQL dan image emulator; **(manual)** user melakukan push ke GitHub dan memastikan workflow hijau, lalu memastikan workflow gagal pada commit uji yang merusak `contract:check` (commit uji itu kemudian di-revert)
