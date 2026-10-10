@@ -105,6 +105,29 @@ Butuh layanan lokal (`docker compose up -d --wait`) dan `.env`.
 
 Akun dibuat lewat tombol daftar di aplikasi dan disimpan di Auth Emulator (hanya di memori: hilang saat container emulator di-restart atau dibuat ulang).
 
+## Image produksi API
+
+`apps/api/Dockerfile` membangun image berisi hasil `pnpm --filter api build` (`dist/`), migrasi `drizzle/`, dan dependency produksi saja. Build dari root repo; isi yang dikirim ke Docker dibatasi `.dockerignore` (allowlist), jadi `.env` tidak pernah ikut:
+
+```sh
+docker build -f apps/api/Dockerfile -t profil-a/api:local .
+```
+
+Container menjalankan `node dist/server.js` di port `3000` dengan `NODE_ENV=production`. Env yang wajib sama dengan `apps/api/src/core/config/env.ts` (minimal `DATABASE_URL`, `FIREBASE_PROJECT_ID`, `CORS_ORIGINS`). Migrasi dijalankan sebagai perintah terpisah sebelum server, dengan image yang sama:
+
+```sh
+docker run --rm -e DATABASE_URL=<url> profil-a/api:local node dist/db/migrate.js
+docker run -d -p 3000:3000 -e DATABASE_URL=<url> -e FIREBASE_PROJECT_ID=<project> -e CORS_ORIGINS=<origin> profil-a/api:local
+```
+
+Mencoba image dengan layanan lokal: dari dalam container, `localhost` adalah container itu sendiri, jadi host PostgreSQL dan emulator diganti `host.docker.internal`, dan `NODE_ENV` dari `.env` (`development`) dipakai karena emulator ditolak saat `production`:
+
+```sh
+docker run --rm -p 3000:3000 --env-file .env -e DATABASE_URL=postgres://template:template@host.docker.internal:5432/template -e FIREBASE_AUTH_EMULATOR_HOST=host.docker.internal:9099 -e FIREBASE_STORAGE_EMULATOR_HOST=host.docker.internal:9199 profil-a/api:local
+```
+
+Image punya `HEALTHCHECK` ke `/health`, dan `docker stop` (SIGTERM) menjalankan shutdown bertahap seperti di lokal.
+
 ## Layanan lokal
 
 ```sh
@@ -133,3 +156,4 @@ docker compose up -d --wait
 | `pnpm check` | Menjalankan semua verifikasi (lint, typecheck, test API, kontrak, Flutter) |
 | `pnpm lint` | Lint dan cek format dengan Biome (`biome check .`) |
 | `pnpm format` | Memperbaiki format dan lint yang bisa diperbaiki otomatis |
+| `pnpm --filter api build` | Mengompilasi API ke `apps/api/dist` (dipakai `apps/api/Dockerfile`) |

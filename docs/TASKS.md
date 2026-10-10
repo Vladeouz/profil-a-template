@@ -102,7 +102,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `.github/workflows/ci.yml`
   - done when: workflow menjalankan langkah yang sama dengan `pnpm check` memakai service PostgreSQL dan image emulator; **(manual)** user melakukan push ke GitHub dan memastikan workflow hijau, lalu memastikan workflow gagal pada commit uji yang merusak `contract:check` (commit uji itu kemudian di-revert)
 
-- [ ] T-019 Dockerfile API untuk produksi
+- [x] T-019 Dockerfile API untuk produksi
   - layer: infra · depends_on: T-017 · refs: FR-15
   - files: `apps/api/Dockerfile`, `apps/api/package.json` (script `build`), `README.md`
   - done when: `docker build -f apps/api/Dockerfile .` sukses; container dijalankan dengan env lokal dan `GET /health` → `200`; `node dist/db/migrate.js` di dalam container sukses; image tidak berisi dependency dev (dibuktikan dengan daftar isi `node_modules`)
