@@ -220,16 +220,37 @@ function main() {
   console.log(`  database         : ${database} (test: ${database}_test)`);
   console.log(`  file diganti     : ${changed.length} (lihat \`git status\`)`);
   console.log('  docs/PRD.md, docs/TASKS.md: placeholder; docs/logs/: dikosongkan');
-  console.log('\nLangkah berikutnya:');
-  console.log(
-    '  1. Bila `.env` sudah ada, salin ulang dari `.env.example` (nilainya ikut berubah).',
-  );
-  console.log(
-    '  2. Bila volume PostgreSQL proyek ini sudah pernah dibuat dengan nama database lama, buat ' +
-      'ulang: `docker compose down -v`, lalu `docker compose up -d --wait`.',
-  );
-  console.log('  3. Jalankan `pnpm check`, lalu commit hasilnya.');
-  console.log('  4. Isi docs/PRD.md dan docs/TASKS.md.');
+  console.log(`\n${nextSteps(name).join('\n')}`);
+}
+
+// Urutan yang sama ada di README › Memulai proyek baru dari template; ubah keduanya bersamaan.
+function nextSteps(name) {
+  return [
+    'Langkah berikutnya, wajib dan berurutan (sama dengan README › Memulai proyek baru dari template):',
+    '',
+    '  1. Buat `.env` dari `.env.example` (timpa bila sudah ada: nilainya ikut berubah).',
+    '       copy .env.example .env',
+    '     Di Git Bash atau Linux: cp .env.example .env',
+    '',
+    '  2. Periksa prasyarat sampai semua baris wajib berstatus OK.',
+    '       pnpm prereq',
+    '',
+    '  3. Nyalakan Docker Desktop, lalu jalankan layanan lokal. Port 5432, 9099, dan 9199 harus',
+    '     bebas: hentikan dulu layanan proyek lain (`docker compose stop` di folder proyek itu).',
+    '       docker compose up -d --wait',
+    '     Bila volume PostgreSQL folder ini pernah dibuat dengan nama database lama, buat ulang',
+    '     dengan `docker compose down -v` sebelum perintah di atas.',
+    '',
+    '  4. Jalankan seluruh verifikasi sampai ringkasannya `Semua 7 langkah OK.`',
+    '       pnpm check',
+    '',
+    '  5. Commit hasil inisialisasi sebelum sesi agent pertama. Agent memulai setiap task dari',
+    '     `master` yang bersih; perubahan yang belum di-commit akan tercampur dengan task.',
+    '       git add -A',
+    `       git commit -m "chore: inisialisasi proyek ${name} dari template"`,
+    '',
+    '  6. Isi docs/PRD.md dan docs/TASKS.md, commit ke `master`, lalu mulai sesi agent pertama.',
+  ];
 }
 
 try {

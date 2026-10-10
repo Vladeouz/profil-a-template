@@ -82,6 +82,18 @@ pnpm 12 menolak versi yang rilis kurang dari sehari (`minimumReleaseAge`). Bila 
 - Merge ke `master` dilakukan user setelah meninjau hasil.
 - `.gitattributes` memaksa LF untuk semua file teks, kecuali `*.bat` dan `*.cmd` (CRLF). `.editorconfig` mengikuti aturan yang sama.
 
+## Memulai proyek dan log task
+
+- Setelah `pnpm init-project <nama>`, urutan wajibnya: buat `.env` dari `.env.example`, `pnpm prereq`, `docker compose up -d --wait`, `pnpm check` hijau, commit hasil inisialisasi, lalu isi `docs/PRD.md` dan `docs/TASKS.md` dan commit ke `master`. Baru setelah itu sesi agent pertama dimulai. Urutan ini dicetak script (`nextSteps` di `scripts/init-project.mjs`) dan sama dengan README › Memulai proyek baru dari template; ubah keduanya bersamaan. Alasannya dari uji agent `daftar-belanja`: hasil inisialisasi belum di-commit saat sesi agent pertama sehingga tercampur dengan task (log T-001 di repo itu), dan `.env` belum ada saat verifikasi manual (log T-004).
+- Agent memulai sesi hanya dari working tree yang bersih (`git status`). Perubahan yang belum di-commit dan bukan milik task dilaporkan ke user, bukan di-commit sendiri.
+- **Setiap langkah verifikasi manual**, baik di log (`docs/logs/T-xxx.md`) maupun yang disampaikan ke user, ditulis lengkap tanpa merujuk log sebelumnya, dan dimulai dengan persiapan:
+  1. `.env` ada di root. Bila belum, user menyalinnya (`copy .env.example .env`, di Git Bash atau Linux `cp .env.example .env`); agent tidak membuatnya.
+  2. `docker compose up -d --wait`.
+  3. `pnpm --filter api db:migrate`, bila ada migrasi baru atau database baru dibuat.
+  4. `pnpm --filter api dev` (terminal terpisah).
+
+  Perintah Flutter web selalu ditulis lengkap dengan flag incognito, dijalankan dari `apps/app`: `flutter run -d chrome --web-port 8081 --web-browser-flag=--incognito --dart-define-from-file=config/dev.json` (alasannya di Lingkungan Flutter dan Android). Android: `flutter run -d <id emulator> --dart-define-from-file=config/dev.json`.
+
 ## Script dan perintah root
 
 - Semua script otomatisasi ditulis dalam Node (`.mjs`) di `scripts/`, bukan shell, agar berjalan sama di CMD, PowerShell, Git Bash, dan Linux CI. Contoh: `scripts/prereq.mjs`.

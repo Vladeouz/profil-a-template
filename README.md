@@ -31,6 +31,7 @@ Fitur `notes` di API dan Flutter adalah contoh pola lengkap dari database sampai
 Buat salinan repo (misalnya repo baru dari template ini di GitHub, lalu clone), kemudian dari root salinan itu:
 
 ```sh
+corepack enable
 pnpm install
 pnpm init-project <nama>
 ```
@@ -41,7 +42,46 @@ pnpm init-project <nama>
 - mengganti judul README ini dan `name` di `package.json`;
 - membuat `docs/PRD.md` dan `docs/TASKS.md` berisi placeholder, dan mengosongkan `docs/logs/`.
 
-`.env` tidak disentuh; bila sudah ada, salin ulang dari `.env.example`. Setelah itu ikuti langkah di bawah sampai `pnpm check` hijau, commit hasilnya, lalu isi `docs/PRD.md` dan `docs/TASKS.md`.
+`.env` tidak disentuh. Di akhir, script mencetak langkah berikutnya. Langkah ini wajib dan dijalankan berurutan, sama persis dengan daftar berikut:
+
+1. Buat `.env` dari `.env.example`. Timpa bila sudah ada, karena nilainya ikut berubah:
+
+   ```sh
+   copy .env.example .env
+   ```
+
+   Di Git Bash atau Linux: `cp .env.example .env`.
+
+2. Periksa prasyarat sampai semua baris wajib berstatus OK:
+
+   ```sh
+   pnpm prereq
+   ```
+
+3. Nyalakan Docker Desktop, lalu jalankan layanan lokal. Port 5432, 9099, dan 9199 harus bebas, jadi hentikan dulu layanan proyek lain (`docker compose stop` di folder proyek itu):
+
+   ```sh
+   docker compose up -d --wait
+   ```
+
+   Bila volume PostgreSQL folder ini pernah dibuat dengan nama database lama, buat ulang dengan `docker compose down -v` sebelum perintah di atas.
+
+4. Jalankan seluruh verifikasi sampai ringkasannya `Semua 7 langkah OK.`:
+
+   ```sh
+   pnpm check
+   ```
+
+5. Commit hasil inisialisasi sebelum sesi agent pertama. Agent memulai setiap task dari `master` yang bersih, sehingga perubahan yang belum di-commit akan tercampur dengan task:
+
+   ```sh
+   git add -A
+   git commit -m "chore: inisialisasi proyek <nama> dari template"
+   ```
+
+6. Isi `docs/PRD.md` dan `docs/TASKS.md`, commit ke `master`, lalu mulai sesi agent pertama.
+
+Penjelasan setiap langkah (dan cara menjalankan API serta Flutter) ada di bagian berikutnya.
 
 ## Dari clone sampai `pnpm check` hijau
 

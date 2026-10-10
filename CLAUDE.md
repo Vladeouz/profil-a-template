@@ -10,6 +10,7 @@
 
 - Baca `docs/PRD.md`, `docs/conventions.md`, dan log task terakhir di `docs/logs/`.
 - Ambil task berikutnya dari `docs/TASKS.md`: task pertama yang belum dicentang dan semua `depends_on`-nya sudah dicentang.
+- Pastikan working tree bersih (`git status`). Jika ada perubahan yang belum di-commit (misalnya hasil `pnpm init-project` atau `docs/PRD.md` yang baru diisi), jangan mulai task dan jangan meng-commit-nya sendiri; laporkan ke user dan minta di-commit dulu ke `master` (langkahnya di README, bagian "Memulai proyek baru dari template").
 - Sebelum mulai, periksa apakah sudah ada branch untuk task itu (`git branch --list "*t-xxx*"`). Jika ada, jangan mengerjakan ulang; laporkan ke user dan tanyakan apakah branch itu perlu digabung dulu.
 
 ## Mengerjakan task
@@ -24,7 +25,7 @@
 ## Verifikasi
 
 - Centang task di `docs/TASKS.md` hanya setelah SEMUA kriteria *done when* terbukti. Jalankan ulang seluruh kriteria dari awal sebelum mencentang, bukan hanya bagian yang terakhir diperbaiki.
-- Untuk kriteria bertanda **(manual)**, tuliskan langkah verifikasi yang jelas untuk user, lalu tunggu konfirmasinya.
+- Untuk kriteria bertanda **(manual)**, tuliskan langkah verifikasi yang jelas untuk user, lalu tunggu konfirmasinya. Langkah itu selalu dimulai dengan persiapan `.env` dan memakai perintah Flutter web lengkap dengan `--web-browser-flag=--incognito` (`docs/conventions.md`, bagian "Memulai proyek dan log task").
 - Jika ada kriteria yang tidak bisa dipenuhi, jangan mencentang. Laporkan penyebabnya dengan jujur.
 - `pnpm check` harus hijau sebelum task apa pun dicentang. Bila ada langkah yang gagal, output lengkapnya ada di `.check-logs/`.
 
