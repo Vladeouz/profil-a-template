@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import pg from 'pg';
 import { describe, expect, inject, it } from 'vitest';
 import { runMigrations } from '../../../src/db/client.js';
@@ -163,6 +163,32 @@ describe('users', () => {
 
     expect(updated?.updatedAt.getTime()).toBeGreaterThan(created?.updatedAt.getTime() ?? 0);
     expect(updated?.createdAt).toEqual(created?.createdAt);
+  });
+
+  it('updated_at dari update() Drizzle memakai now() database, bukan jam host', async () => {
+    await getDb().db.transaction(async (tx) => {
+      // `now()` adalah waktu mulai transaksi dan tidak berubah di dalamnya, sedangkan jam host
+      // terus berjalan: setelah jeda ini, nilai dari `new Date()` pasti berbeda dari `now()`.
+      await tx.execute(sql`select pg_sleep(0.05)`);
+      const {
+        rows: [dbNow],
+      } = await tx.execute<{ now: string }>(
+        // Dibulatkan ke milidetik seperti kolom `timestamptz(3)`, lalu ditulis sebagai ISO UTC.
+        sql`select to_char(now()::timestamptz(3) at time zone 'UTC',
+                           'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as now`,
+      );
+
+      const [created] = await tx.insert(users).values({ firebaseUid: 'uid-1' }).returning();
+      const [updated] = await tx
+        .update(users)
+        .set({ displayName: 'Budi' })
+        .where(eq(users.firebaseUid, 'uid-1'))
+        .returning();
+
+      expect(updated?.updatedAt.toISOString()).toBe(dbNow?.now);
+      // `created_at` (`defaultNow()`) dan `updated_at` berasal dari jam yang sama.
+      expect(updated?.updatedAt).toEqual(created?.createdAt);
+    });
   });
 });
 

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // Kolom bersama untuk semua tabel. Tabel baru memakai helper ini, bukan menulis ulang definisinya.
@@ -13,9 +14,11 @@ export const timestamptz = (name: string) =>
 
 export const createdAt = () => timestamptz('created_at').notNull().defaultNow();
 
-// Diperbarui otomatis oleh Drizzle pada setiap `update()`; SQL mentah harus mengisinya sendiri.
+// Diperbarui otomatis oleh Drizzle pada setiap `update()`; SQL mentah harus mengisinya sendiri
+// dengan `now()`. Nilainya `now()` database, bukan `new Date()`: jam host API dan jam database bisa
+// berselisih, sehingga `updated_at` bisa lebih kecil dari `created_at` atau nilai sebelumnya.
 export const updatedAt = () =>
   timestamptz('updated_at')
     .notNull()
     .defaultNow()
-    .$onUpdate(() => new Date());
+    .$onUpdate(() => sql`now()`);

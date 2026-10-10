@@ -109,6 +109,8 @@ describe('notes', () => {
       .where(eq(notes.id, note.id))
       .returning();
 
+    // Insert (`defaultNow()`) dan update (`$onUpdate` → `now()`) sama-sama memakai jam database,
+    // jadi nilainya tidak pernah mundur. Bisa sama karena presisi milidetik.
     expect(updated?.updatedAt.getTime()).toBeGreaterThanOrEqual(note.updatedAt.getTime());
     expect(updated?.createdAt).toEqual(note.createdAt);
   });
