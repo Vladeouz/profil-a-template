@@ -116,3 +116,22 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - layer: infra · depends_on: T-020 · refs: FR-16
   - files: `scripts/init-project.mjs`, `package.json`, `README.md`, `docs/PRD.md` dan `docs/TASKS.md` (placeholder)
   - done when: dijalankan pada salinan repo (bukan repo template itu sendiri) dengan nama `uji-proyek`, script mengganti `demo-template` menjadi `demo-uji-proyek`, nama database, dan judul README, mengganti `docs/PRD.md` dan `docs/TASKS.md` dengan placeholder, serta mengosongkan `docs/logs/`; `pnpm check` hijau di salinan itu; menjalankan script dua kali ditolak dengan pesan jelas
+
+## Fase 5 — Perbaikan dari uji agent (`daftar-belanja`)
+
+Sumber: log T-001 sampai T-007 di repo `daftar-belanja` (`D:\dev\daftar-belanja\docs\logs\`) dan `docs/conventions.md` di repo itu. Repo tersebut boleh dibaca sebagai rujukan; jangan menyalin apa pun yang spesifik daftar belanja.
+
+- [ ] T-022 Konvensi pola lanjutan dan widget bersama Flutter
+  - layer: docs, app · depends_on: T-021 · refs: NFR-06
+  - files: `docs/conventions.md`, `apps/app/lib/core/widgets/` (baru), `apps/app/lib/features/notes/presentation/**`, `apps/app/test/**`
+  - done when: `docs/conventions.md` memuat pola yang ditemukan di uji agent, masing-masing dengan file contoh di template bila ada: pelanggaran keunikan (constraint bernama → error domain di repository → `CONFLICT` di use case), penamaan skema respons endpoint aksi non-CRUD (`<Operasi>Result`), daftar berpagination dengan filter (membuang hasil request lama saat filter diganti), kegagalan aksi di daftar lewat SnackBar, teks kegagalan khusus fitur di field yang tetap diturunkan dari `code`, dan varian form untuk fitur tanpa `GET` per item; `FailureView` dan `LoadMoreFooter` dipindah dari fitur notes ke `apps/app/lib/core/widgets/` dan notes memakainya dari sana; `pnpm check` hijau
+
+- [ ] T-023 Diagnosis error: Flutter web, `Failure`, dan verifikasi token
+  - layer: app, api · depends_on: T-022 · refs: FR-04, FR-11, FR-12
+  - files: `README.md`, `apps/app/README.md`, `docs/conventions.md`, `apps/app/lib/core/error/`, `apps/app/lib/core/network/api_call.dart`, `apps/app/lib/features/auth/data/firebase_auth_repository.dart`, `apps/api/src/core/auth/`, test terkait
+  - done when: semua perintah menjalankan Flutter web memakai `--web-browser-flag=--incognito` beserta penjelasan penyebabnya (sesi Firebase web tersimpan antar-run divalidasi ke Google sebelum `useAuthEmulator`); `Failure` asli tercatat di konsol hanya di mode debug, di batas tempat exception menjadi `Failure` (pola `logFailure` dari `daftar-belanja`); penolakan token di middleware autentikasi API mencatat kode error firebase-admin di log level `warn` tanpa token atau isinya, dibuktikan test; `pnpm check` hijau
+
+- [ ] T-024 Alur memulai proyek baru
+  - layer: infra, docs · depends_on: T-023 · refs: FR-01, FR-16
+  - files: `scripts/init-project.mjs`, `README.md`, `docs/conventions.md`, `CLAUDE.md`
+  - done when: output akhir `pnpm init-project` mencantumkan urutan langkah yang wajib, termasuk menyalin `.env`, `pnpm prereq`, `docker compose up -d --wait`, `pnpm check`, dan commit hasil inisialisasi sebelum sesi agent pertama; README memuat urutan yang sama; `docs/conventions.md` mewajibkan langkah verifikasi manual di setiap log menyebut persiapan `.env` dan perintah Flutter web dengan flag incognito; diuji pada salinan baru yang dibuat dengan `git clone` dari repo GitHub, `pnpm init-project uji-kedua`, lalu mengikuti output script sampai `pnpm check` hijau dan `pnpm prereq` melaporkan semua prasyarat OK
