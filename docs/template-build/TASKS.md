@@ -131,7 +131,7 @@ Sumber: log T-001 sampai T-007 di repo `daftar-belanja` (`D:\dev\daftar-belanja\
   - files: `README.md`, `apps/app/README.md`, `docs/conventions.md`, `apps/app/lib/core/error/`, `apps/app/lib/core/network/api_call.dart`, `apps/app/lib/features/auth/data/firebase_auth_repository.dart`, `apps/api/src/core/auth/`, test terkait
   - done when: semua perintah menjalankan Flutter web memakai `--web-browser-flag=--incognito` beserta penjelasan penyebabnya (sesi Firebase web tersimpan antar-run divalidasi ke Google sebelum `useAuthEmulator`); `Failure` asli tercatat di konsol hanya di mode debug, di batas tempat exception menjadi `Failure` (pola `logFailure` dari `daftar-belanja`); penolakan token di middleware autentikasi API mencatat kode error firebase-admin di log level `warn` tanpa token atau isinya, dibuktikan test; `pnpm check` hijau
 
-- [ ] T-024 Alur memulai proyek baru
+- [x] T-024 Alur memulai proyek baru
   - layer: infra, docs · depends_on: T-023 · refs: FR-01, FR-16
   - files: `scripts/init-project.mjs`, `README.md`, `docs/conventions.md`, `CLAUDE.md`
   - done when: output akhir `pnpm init-project` mencantumkan urutan langkah yang wajib, termasuk menyalin `.env`, `pnpm prereq`, `docker compose up -d --wait`, `pnpm check`, dan commit hasil inisialisasi sebelum sesi agent pertama; README memuat urutan yang sama; `docs/conventions.md` mewajibkan langkah verifikasi manual di setiap log menyebut persiapan `.env` dan perintah Flutter web dengan flag incognito; diuji pada salinan baru yang dibuat dengan `git clone` dari repo GitHub, `pnpm init-project uji-kedua`, lalu mengikuti output script sampai `pnpm check` hijau dan `pnpm prereq` melaporkan semua prasyarat OK
