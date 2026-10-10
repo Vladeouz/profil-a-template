@@ -8,7 +8,7 @@ export const healthRoute = createRoute({
   path: '/health',
   operationId: 'getHealth',
   tags: ['system'],
-  summary: 'Health check',
+  summary: 'Health check uji CI',
   responses: {
     200: {
       description: 'API berjalan',
