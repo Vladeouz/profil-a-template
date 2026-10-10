@@ -107,7 +107,7 @@ Setiap task dikerjakan dalam satu sesi. Kriteria bertanda **(manual)** diverifik
   - files: `apps/api/Dockerfile`, `apps/api/package.json` (script `build`), `README.md`
   - done when: `docker build -f apps/api/Dockerfile .` sukses; container dijalankan dengan env lokal dan `GET /health` → `200`; `node dist/db/migrate.js` di dalam container sukses; image tidak berisi dependency dev (dibuktikan dengan daftar isi `node_modules`)
 
-- [ ] T-020 Dokumentasi final dan pembersihan
+- [x] T-020 Dokumentasi final dan pembersihan
   - layer: docs · depends_on: T-018, T-019 · refs: FR-16, NFR-06
   - files: `docs/conventions.md`, `CLAUDE.md`, `README.md`, `docs/template-build/`, `spikes/` (dihapus)
   - done when: `docs/conventions.md` memuat semua konvensi bagian 3 dan 5 PRD, versi library yang dipin, dan rujukan ke file contoh untuk setiap konvensi; PRD, TASKS, dan log pembangunan template dipindah ke `docs/template-build/`; `spikes/` dihapus; `pnpm check` tetap hijau
