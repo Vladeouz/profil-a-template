@@ -12,7 +12,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "contract:generate": "node scripts/contract.mjs generate",
-    "contract:check": "node scripts/contract.mjs check"
+    "contract:check": "node scripts/contract.mjs check",
+    "init-project": "node scripts/init-project.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14"

@@ -7,12 +7,12 @@ Dokumen ini adalah rujukan konvensi untuk manusia dan agent, dan berlaku untuk s
 ```
 .
 ├── CLAUDE.md                  # aturan kerja agent
-├── package.json               # script root: prereq, check, lint, format, contract:generate, contract:check
+├── package.json               # script root: prereq, check, lint, format, contract:generate, contract:check, init-project
 ├── pnpm-workspace.yaml        # workspace apps/*, packages/*; allowBuilds
 ├── biome.json .editorconfig .gitattributes .nvmrc .env.example
 ├── docker-compose.yml docker/firebase-emulator/Dockerfile
 ├── firebase.json .firebaserc storage.rules
-├── scripts/                   # prereq.mjs, check.mjs, contract.mjs
+├── scripts/                   # prereq.mjs, check.mjs, contract.mjs, init-project.mjs
 ├── .github/workflows/ci.yml
 ├── docs/                      # PRD.md, TASKS.md, logs/ (proyek), conventions.md, template-build/
 ├── apps/api/                  # API Hono (lihat bagian API dan Clean Architecture API)

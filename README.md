@@ -24,6 +24,23 @@ Fitur `notes` di API dan Flutter adalah contoh pola lengkap dari database sampai
 | Android SDK + emulator | tidak | hanya untuk verifikasi Android |
 | File `.env` | ya | salin sendiri dari `.env.example` |
 
+## Memulai proyek baru dari template
+
+Buat salinan repo (misalnya repo baru dari template ini di GitHub, lalu clone), kemudian dari root salinan itu:
+
+```sh
+pnpm install
+pnpm init-project <nama>
+```
+
+`<nama>` berisi huruf kecil, angka, dan tanda hubung (maksimal 25 karakter), misalnya `gym-membership`. Script ini hanya dijalankan sekali (kedua kalinya ditolak) dan:
+
+- mengganti project Firebase `demo-template` menjadi `demo-<nama>` dan nama database `template` menjadi `<nama>` dengan `-` diganti `_` (database test `<nama>_test`), di semua file yang dilacak Git kecuali `docs/template-build/`;
+- mengganti judul README ini dan `name` di `package.json`;
+- membuat `docs/PRD.md` dan `docs/TASKS.md` berisi placeholder, dan mengosongkan `docs/logs/`.
+
+`.env` tidak disentuh; bila sudah ada, salin ulang dari `.env.example`. Setelah itu ikuti langkah di bawah sampai `pnpm check` hijau, commit hasilnya, lalu isi `docs/PRD.md` dan `docs/TASKS.md`.
+
 ## Dari clone sampai `pnpm check` hijau
 
 Perintah dijalankan dari root repo (kecuali disebut lain) dan berlaku di CMD, PowerShell, Git Bash, maupun Linux.
@@ -164,4 +181,5 @@ docker compose up -d --wait
 | `pnpm check` | Menjalankan semua verifikasi (lint, typecheck, test API, kontrak, Flutter) |
 | `pnpm lint` | Lint dan cek format dengan Biome (`biome check .`) |
 | `pnpm format` | Memperbaiki format dan lint yang bisa diperbaiki otomatis |
+| `pnpm init-project <nama>` | Memulai proyek baru dari salinan template (sekali saja) |
 | `pnpm --filter api build` | Mengompilasi API ke `apps/api/dist` (dipakai `apps/api/Dockerfile`) |
